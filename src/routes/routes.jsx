@@ -10,6 +10,7 @@ import ResetPasswordNew from "../pages/ResetPassword/ResetPasswordNew";
 import Files from "../pages/Files/Files";
 import Folders from "../pages/Folders/Folders";
 import ComingSoon from "../pages/Static/ComingSoon";
+import Pricing from "../pages/Pricing/Pricing";
 import PageNotFound from "../pages/Static/PageNotFound";
 import VerifyEmail from "../pages/VerifyEmail/VerifyEmail";
 import SignupSuccess from "../pages/Signup/SignupSuccess";
@@ -38,7 +39,7 @@ const router = createBrowserRouter(
         <Route path="login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPasswordEmail />} />
         <Route path="/products" element={<ComingSoon />} />
-        <Route path="/pricing" element={<ComingSoon />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/reset-password/:uid/:token" element={<ResetPasswordNew />} />
 
         // Protected Routes

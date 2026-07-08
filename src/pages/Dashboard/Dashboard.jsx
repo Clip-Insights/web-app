@@ -4,8 +4,10 @@ import Header from "../../components/Header/Header";
 import { getApiUrl } from "../../services/apiService";
 import CircularProgress from "../../components/Dashboard/CircularProgress";
 import StorageUsage from "../../components/Dashboard/StorageUsage";
+import UsagePanel from "../../components/Dashboard/UsagePanel";
 import RecentFiles from "../Files/RecentFiles";
 import Sidebar from "../../components/Sidebar/Sidebar";
+import { fetchMyPlan } from "../../services/planService";
 
 const Dashboard = () => {
   const name = "Fellow";
@@ -15,7 +17,21 @@ const Dashboard = () => {
     remaining: 0,
     used: 0,
   });
+  const [planData, setPlanData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchPlanUsage() {
+      try {
+        const data = await fetchMyPlan(authRequest);
+        if (data?.plan) setPlanData(data);
+      } catch (error) {
+        // The dashboard still works without the usage panel.
+        console.error("Error fetching plan usage:", error);
+      }
+    }
+    fetchPlanUsage();
+  }, [authRequest]);
 
   useEffect(() => {
     async function fetchUserSpaceInfo() {
@@ -110,6 +126,7 @@ const Dashboard = () => {
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <h1 className="text-xl font-inter font-semibold mb-4">Hello, {name} 👋</h1>
+          {planData && <UsagePanel planName={planData.plan.name} usage={planData.usage} />}
           <StorageUsage
             label="Total Space"
             value={`${storageData.total} MB`}

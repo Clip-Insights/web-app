@@ -1,16 +1,36 @@
 import { Outlet, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar/Sidebar';
 import Header from '../components/Header/Header';
 import routeMeta from '../utils/routeMeta';
+import { useAuth } from '../context/AuthContext';
+import { fetchMyPlan } from '../services/planService';
 
 function MainLayout() {
   const location = useLocation();
+  const { isAuthenticated, authRequest } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [packagePlan, setPackagePlan] = useState(null);
 
   const hideSidebarRoutes = ['/login', '/signup', '/reset-password'];
-  const hideheader = ['/pricing', '/products'];
   const shouldHideSidebar = hideSidebarRoutes.includes(location.pathname);
+
+  // The header badge shows the user's real plan (from the backend), not a placeholder.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setPackagePlan(null);
+      return;
+    }
+    let cancelled = false;
+    fetchMyPlan(authRequest)
+      .then((data) => {
+        if (!cancelled && data?.plan) setPackagePlan({ name: data.plan.name });
+      })
+      .catch((error) => console.error('Error fetching plan for header:', error));
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, authRequest]);
 
   // Sort keys so more specific routes match first.
   const sortedKeys = Object.keys(routeMeta).sort((a, b) => b.length - a.length);
@@ -33,15 +53,6 @@ function MainLayout() {
       {!shouldHideSidebar && (
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       )}
-        {!hideheader && (
-          <Header
-            title={meta.title}
-            subtitle={meta.subtitle}
-            onToggleSidebar={handleSidebarToggle}
-            isSidebarOpen={isSidebarOpen}
-            packagePlan={{ name: 'Pro' }}
-          />
-      )}
 
       <div className="flex-1 flex flex-col">
         {!shouldHideSidebar && (
@@ -50,7 +61,7 @@ function MainLayout() {
             subtitle={meta.subtitle}
             onToggleSidebar={handleSidebarToggle}
             isSidebarOpen={isSidebarOpen}
-            packagePlan={{ name: 'Pro' }}
+            packagePlan={packagePlan}
           />
         )}
         <main className="flex-1 p-4 pt-0 sm:p-6 md:p-8">
