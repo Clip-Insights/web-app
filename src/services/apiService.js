@@ -51,7 +51,7 @@ export const getApiUrl = (endpoint) => {
 const secretKey = 'your-secret-key'; // Use a strong secret key
 
 export const encryptToken = (token) => {
-  return token
+  if (!token) return null;
   try {
     return CryptoJS.AES.encrypt(token, secretKey).toString();
   } catch (error) {
@@ -61,10 +61,10 @@ export const encryptToken = (token) => {
 };
 
 export const decryptToken = (encryptedToken) => {
-  return encryptedToken
+  if (!encryptedToken) return null;
   try {
     const bytes = CryptoJS.AES.decrypt(encryptedToken, secretKey);
-    return bytes.toString(CryptoJS.enc.Utf8);
+    return bytes.toString(CryptoJS.enc.Utf8) || null;
   } catch (error) {
     console.error('Decryption failed:', error);
     return null;

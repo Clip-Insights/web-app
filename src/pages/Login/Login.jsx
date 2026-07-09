@@ -3,7 +3,7 @@ import login_png from "/images/login.png";
 import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../../services/Utils";
 import { useNavigate } from "react-router-dom";
-import { getApiUrl, encryptToken } from "../../services/apiService";
+import { getApiUrl } from "../../services/apiService";
 import { useAuth } from "../../context/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
 
@@ -42,9 +42,8 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        const access = encryptToken(data.token.access);
-        const refresh = encryptToken(data.token.refresh);
-        login({ access: access, refresh: refresh });
+        // AuthContext encrypts once on store — don't encrypt here.
+        login({ access: data.token.access, refresh: data.token.refresh });
         
         handleSuccess("Login successful!");
         setTimeout(() => {
@@ -78,9 +77,7 @@ const Login = () => {
       const data = await response.json();
       
       if (response.ok) {
-        const access = encryptToken(data.token.access);
-        const refresh = encryptToken(data.token.refresh);
-        login({ access: access, refresh: refresh });
+        login({ access: data.token.access, refresh: data.token.refresh });
         handleSuccess("Google login successful!");
         setTimeout(() => {
           navigate('/');

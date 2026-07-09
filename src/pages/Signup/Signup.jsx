@@ -4,6 +4,8 @@ import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../../services/Utils";
 import { useNavigate } from "react-router-dom";
 import { getApiUrl } from "../../services/apiService";
+import { useAuth } from "../../context/AuthContext";
+import { GoogleLogin } from "@react-oauth/google";
 
 const Signup = () => {
   const [email, setEmail] = useState("");
@@ -11,6 +13,7 @@ const Signup = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
@@ -73,6 +76,34 @@ const Signup = () => {
       handleError("Server error. Please try again later.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleSignup = async (credentialResponse) => {
+    try {
+      const url = getApiUrl("account/google-login/");
+      const response = await fetch(url, {
+        method: "POST",
+        body: JSON.stringify({ token: credentialResponse.credential }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        login({ access: data.token.access, refresh: data.token.refresh });
+        handleSuccess("Signed up with Google!");
+        setTimeout(() => {
+          navigate("/");
+        }, 1500);
+      } else {
+        handleError(data.error || "Google signup failed");
+      }
+    } catch (error) {
+      console.error("Google signup error:", error);
+      handleError("Google signup failed. Please try again.");
     }
   };
 
@@ -165,6 +196,21 @@ const Signup = () => {
           </button>
         </form>
         <ToastContainer />
+
+        <div className="my-4 flex items-center">
+          <div className="flex-grow border-t border-gray-300"></div>
+          <span className="mx-4 text-gray-500">OR</span>
+          <div className="flex-grow border-t border-gray-300"></div>
+        </div>
+        <div className="flex justify-center">
+          <GoogleLogin
+            text="signup_with"
+            onSuccess={handleGoogleSignup}
+            onError={() => {
+              handleError("Google signup failed");
+            }}
+          />
+        </div>
 
         {/* Login Link */}
         <p className="mt-6 text-gray-700 text-sm">
