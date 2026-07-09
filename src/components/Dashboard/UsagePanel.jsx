@@ -6,61 +6,63 @@ const USAGE_ROWS = [
   { key: 'transcription', label: 'Transcriptions' },
 ];
 
+// Meter color carries state: brand while fine, amber when running low, red when spent.
+const meterColor = (fraction) => {
+  if (fraction >= 1) return 'bg-red-500';
+  if (fraction >= 0.8) return 'bg-amber-500';
+  return 'bg-customPrimary';
+};
+
+const Meter = ({ label, used, limit }) => {
+  const fraction = limit > 0 ? Math.min(1, used / limit) : 1;
+  return (
+    <div>
+      <div className="flex justify-between items-baseline mb-1.5">
+        <span className="text-sm text-gray-600">{label}</span>
+        <span className="text-sm font-semibold text-gray-900 tabular-nums">
+          {used}<span className="font-normal text-gray-400"> / {limit}</span>
+        </span>
+      </div>
+      <div className="w-full h-2 bg-gray-100 rounded-full">
+        <div
+          className={`h-full rounded-full transition-[width] duration-500 ${meterColor(fraction)}`}
+          style={{ width: `${fraction * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
 /** Daily AI usage meters, driven by GET /api/plans/me/. */
 const UsagePanel = ({ planName, usage }) => {
   if (!usage) return null;
 
-  const nearLimit = USAGE_ROWS.some(({ key }) => {
-    const row = usage[key];
-    return row && row.limit > 0 && row.remaining / row.limit <= 0.2;
-  });
-
   return (
-    <div className="bg-[#FCFCFF] border p-6 rounded-3xl mb-4">
-      <div className="flex items-center justify-between mb-4">
+    <section className="bg-white border border-gray-200 rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <span className="text-sm font-medium text-gray-700 font-inter">Today's AI usage</span>
+          <h2 className="text-sm font-semibold text-gray-700">Today's AI usage</h2>
           <p className="text-xs text-gray-400 mt-0.5">Limits reset on a rolling 24-hour window</p>
         </div>
-        <span className="text-xs font-semibold uppercase tracking-widest text-customPrimary">{planName} plan</span>
+        <span className="shrink-0 px-2.5 py-1 rounded-full bg-indigo-50 text-customPrimary text-xs font-semibold">
+          {planName}
+        </span>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {USAGE_ROWS.map(({ key, label }) => {
           const row = usage[key];
           if (!row) return null;
-          const pct = row.limit > 0 ? Math.min(100, (row.used / row.limit) * 100) : 100;
-          return (
-            <div key={key}>
-              <div className="flex justify-between mb-1 text-sm">
-                <span className="text-gray-600 font-inter">{label}</span>
-                <span className="font-semibold text-gray-800 tabular-nums">
-                  {row.used} / {row.limit}
-                </span>
-              </div>
-              <div className="relative w-full h-2.5 bg-gray-200 rounded">
-                <div
-                  className="absolute top-0 left-0 h-full rounded"
-                  style={{
-                    width: `${pct}%`,
-                    background: 'linear-gradient(to right, #3E4FFD 0%, #8000BB 100%)',
-                  }}
-                ></div>
-              </div>
-            </div>
-          );
+          return <Meter key={key} label={label} used={row.used} limit={row.limit} />;
         })}
       </div>
 
-      {nearLimit && (
-        <p className="mt-4 text-xs text-gray-500">
-          Running low?{' '}
-          <Link to="/pricing" className="text-customPrimary font-medium hover:text-customPrimaryHover">
-            See plans with higher limits
-          </Link>
-        </p>
-      )}
-    </div>
+      <div className="mt-6 pt-4 border-t border-gray-100">
+        <Link to="/pricing" className="text-xs font-medium text-customPrimary hover:text-customPrimaryHover">
+          Need higher limits? Compare plans →
+        </Link>
+      </div>
+    </section>
   );
 };
 

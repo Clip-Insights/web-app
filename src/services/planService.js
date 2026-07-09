@@ -16,9 +16,7 @@ export async function fetchPlans() {
 /** The logged-in user's plan and live usage. Pass AuthContext's authRequest. */
 export async function fetchMyPlan(authRequest) {
   const response = await authRequest({ method: 'get', url: getApiUrl('plans/me/') });
-  // authRequest returns an axios response normally, but the bare payload after
-  // a token-refresh retry — accept both shapes.
-  return response?.data ?? response;
+  return response.data;
 }
 
 export function formatStorage(mb) {
