@@ -58,7 +58,7 @@ const VerifyEmail = () => {
     }
 
     try {
-      const url = getApiUrl("account/reset-password/"); // Using reset-password endpoint as a proxy
+      const url = getApiUrl("account/resend-verification/");
       const response = await fetch(url, {
         method: "POST",
         headers: {
