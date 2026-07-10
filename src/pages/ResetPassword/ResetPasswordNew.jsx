@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import signup_png from "/images/signup.png";
 import { getApiUrl } from "../../services/apiService";
+import { handleError } from "../../services/Utils";
 
 const ResetPasswordNew = () => {
   const { uid, token } = useParams();
