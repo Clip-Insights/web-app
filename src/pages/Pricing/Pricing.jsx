@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, NotebookPen, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { fetchMyPlan, fetchPlans, formatMinutes, formatStorage } from '../../services/planService';
+import { fetchMyPlan, fetchPlans, formatStorage } from '../../services/planService';
 
 /**
  * Every number on this page is fetched from the backend plan catalogue —
@@ -15,9 +15,7 @@ function limitRows(plan) {
   return [
     { label: 'AI summaries + key points', value: `${plan.daily_summaries} / day` },
     { label: 'AI chat messages', value: `${plan.daily_chat_messages} / day` },
-    { label: 'Audio transcriptions', value: `${plan.daily_transcriptions} / day` },
     { label: 'Video context per request', value: `${(plan.transcript_token_budget / 1000).toFixed(0)}k tokens` },
-    { label: 'Transcription length', value: formatMinutes(plan.max_transcription_seconds) },
     { label: 'Cloud storage for PDFs', value: formatStorage(plan.storage_limit_mb) },
     { label: 'Largest single file', value: formatStorage(plan.max_file_size_mb) },
     { label: 'Note length', value: `${plan.max_note_chars.toLocaleString()} characters` },

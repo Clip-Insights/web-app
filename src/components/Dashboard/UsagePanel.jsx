@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 const USAGE_ROWS = [
   { key: 'summary', label: 'Summaries + key points' },
   { key: 'chat', label: 'Chat messages' },
-  { key: 'transcription', label: 'Transcriptions' },
 ];
 
 // Meter color carries state: brand while fine, amber when running low, red when spent.

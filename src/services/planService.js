@@ -23,7 +23,3 @@ export function formatStorage(mb) {
   if (mb >= 1024) return `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB`;
   return `${mb} MB`;
 }
-
-export function formatMinutes(seconds) {
-  return `${Math.round(seconds / 60)} min`;
-}
