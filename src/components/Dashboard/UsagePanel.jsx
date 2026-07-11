@@ -37,7 +37,7 @@ const UsagePanel = ({ planName, usage }) => {
   if (!usage) return null;
 
   return (
-    <section className="bg-white border border-gray-200 rounded-2xl p-6">
+    <section className="h-full bg-white border border-gray-200 rounded-2xl p-6 flex flex-col">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-sm font-semibold text-gray-700">Today's AI usage</h2>
@@ -48,7 +48,7 @@ const UsagePanel = ({ planName, usage }) => {
         </span>
       </div>
 
-      <div className="space-y-5">
+      <div className="flex-1 flex flex-col justify-center space-y-6">
         {USAGE_ROWS.map(({ key, label }) => {
           const row = usage[key];
           if (!row) return null;

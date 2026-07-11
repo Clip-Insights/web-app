@@ -96,7 +96,7 @@ const Dashboard = () => {
             {planData ? (
               <UsagePanel planName={planData.plan.name} usage={planData.usage} />
             ) : (
-              <section className="bg-white border border-gray-200 rounded-2xl p-6 text-sm text-gray-500">
+              <section className="h-full bg-white border border-gray-200 rounded-2xl p-6 flex items-center text-sm text-gray-500">
                 Usage information is unavailable right now. Refresh to try again.
               </section>
             )}
@@ -104,7 +104,7 @@ const Dashboard = () => {
           {storageData ? (
             <StorageCard usedMb={storageData.usedMb} totalMb={storageData.totalMb} />
           ) : (
-            <section className="bg-white border border-gray-200 rounded-2xl p-6 text-sm text-gray-500">
+            <section className="h-full bg-white border border-gray-200 rounded-2xl p-6 flex items-center text-sm text-gray-500">
               Storage information is unavailable right now. Refresh to try again.
             </section>
           )}
