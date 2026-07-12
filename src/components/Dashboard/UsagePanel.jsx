@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { formatResetTime } from '../../services/planService';
 
 const USAGE_ROWS = [
   { key: 'summary', label: 'Summaries + key points' },
@@ -12,8 +13,11 @@ const meterColor = (fraction) => {
   return 'bg-customPrimary';
 };
 
-const Meter = ({ label, used, limit }) => {
+const Meter = ({ label, used, limit, resetsAt }) => {
   const fraction = limit > 0 ? Math.min(1, used / limit) : 1;
+  // Only a spent meter needs the unblock time; formatResetTime renders the
+  // backend's UTC timestamp in the viewer's timezone.
+  const resetPhrase = fraction >= 1 && resetsAt ? formatResetTime(resetsAt) : null;
   return (
     <div>
       <div className="flex justify-between items-baseline mb-1.5">
@@ -28,6 +32,7 @@ const Meter = ({ label, used, limit }) => {
           style={{ width: `${fraction * 100}%` }}
         />
       </div>
+      {resetPhrase && <p className="text-xs text-gray-400 mt-1.5">Resets {resetPhrase}</p>}
     </div>
   );
 };
@@ -52,7 +57,7 @@ const UsagePanel = ({ planName, usage }) => {
         {USAGE_ROWS.map(({ key, label }) => {
           const row = usage[key];
           if (!row) return null;
-          return <Meter key={key} label={label} used={row.used} limit={row.limit} />;
+          return <Meter key={key} label={label} used={row.used} limit={row.limit} resetsAt={row.resets_at} />;
         })}
       </div>
 
