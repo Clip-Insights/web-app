@@ -1,142 +1,117 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
-import Header from "../../components/Header/Header";
 import { getApiUrl } from "../../services/apiService";
-import CircularProgress from "../../components/Dashboard/CircularProgress";
-import StorageUsage from "../../components/Dashboard/StorageUsage";
+import StorageCard from "../../components/Dashboard/StorageCard";
+import UsagePanel from "../../components/Dashboard/UsagePanel";
 import RecentFiles from "../Files/RecentFiles";
-import Sidebar from "../../components/Sidebar/Sidebar";
+import { fetchMyPlan } from "../../services/planService";
+
+const greetingForNow = () => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+};
+
+const SkeletonCard = ({ className = "" }) => (
+  <div className={`bg-white border border-gray-200 rounded-2xl p-6 animate-pulse ${className}`}>
+    <div className="h-4 bg-gray-100 rounded w-40 mb-6"></div>
+    {[1, 2, 3].map((row) => (
+      <div key={row} className="mb-5">
+        <div className="flex justify-between mb-2">
+          <div className="h-3 bg-gray-100 rounded w-32"></div>
+          <div className="h-3 bg-gray-100 rounded w-10"></div>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full w-full"></div>
+      </div>
+    ))}
+  </div>
+);
 
 const Dashboard = () => {
-  const name = "Fellow";
   const { authRequest } = useAuth();
-  const [storageData, setStorageData] = useState({
-    total: 0,
-    remaining: 0,
-    used: 0,
-  });
+  const [name, setName] = useState("");
+  const [storageData, setStorageData] = useState(null);
+  const [planData, setPlanData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchUserSpaceInfo() {
-      try {
-        const response = await authRequest({
-          method: "get",
-          url: getApiUrl("userspace/storage-info"),
+    let cancelled = false;
+
+    const loadProfile = authRequest({ method: "get", url: getApiUrl("account/profile/") })
+      .then((response) => {
+        if (!cancelled && response.data?.name) setName(response.data.name);
+      })
+      .catch((error) => console.error("Error fetching profile:", error));
+
+    const loadPlan = fetchMyPlan(authRequest)
+      .then((data) => {
+        if (!cancelled && data?.plan) setPlanData(data);
+      })
+      .catch((error) => console.error("Error fetching plan usage:", error));
+
+    const loadStorage = authRequest({ method: "get", url: getApiUrl("userspace/storage-info") })
+      .then((response) => {
+        if (cancelled || response.data?.message !== "success") return;
+        setStorageData({
+          totalMb: (response.data.allowed_space / (1024 * 1024)).toFixed(1),
+          usedMb: (response.data.used_space / (1024 * 1024)).toFixed(1),
         });
+      })
+      .catch((error) => console.error("Error fetching storage data:", error));
 
-        if (response.data?.message === "success") {
-          setStorageData({
-            total: (response.data.allowed_space / (1024 * 1024)).toFixed(1), // MB
-            remaining: (response.data.remaining_space / (1024 * 1024)).toFixed(1), // MB
-            used: (response.data.used_space / (1024 * 1024)).toFixed(1), // MB
-          });
-        } else {
-          console.error("Unexpected response format:", response);
-        }
-      } catch (error) {
-        console.error("Error fetching storage data:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
+    Promise.allSettled([loadProfile, loadPlan, loadStorage]).then(() => {
+      if (!cancelled) setLoading(false);
+    });
 
-    fetchUserSpaceInfo();
+    return () => {
+      cancelled = true;
+    };
   }, [authRequest]);
 
-  // Calculate percentage used
-  const percentageUsed = (storageData.used / storageData.total) * 100;
-
-  if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-6">
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column loading state */}
-          <div className="lg:col-span-2">
-            <div className="animate-pulse">
-              {/* User greeting skeleton */}
-              <div className="h-8 bg-gray-200 rounded w-48 mb-6"></div>
-              
-              {/* StorageUsage skeletons */}
-              {[1, 2, 3].map((item) => (
-                <div key={item} className="mb-4">
-                  <div className="flex justify-between mb-2">
-                    <div className="h-4 bg-gray-200 rounded w-24"></div>
-                    <div className="h-4 bg-gray-200 rounded w-16"></div>
-                  </div>
-                  <div className="h-4 bg-gray-200 rounded-full w-full"></div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Right column loading state */}
-          <div className="bg-[#FCFCFF] rounded-3xl border flex items-center justify-center max-h-[500px]">
-            <div className="animate-pulse flex flex-col items-center p-8">
-              <div className="h-32 w-32 bg-gray-200 rounded-full mb-4"></div>
-              <div className="h-5 bg-gray-200 rounded w-24 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-16"></div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Recent Files loading state */}
-        <div className="mt-8">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-40 mb-4"></div>
-            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-              {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="h-40 bg-gray-200 rounded-lg"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* <Header 
-        title="Dashboard"
-        subtitle="Where you can see your files, Securely!"
-        icon="😊"
-        packagePlan={{
-          name: "Starter",
-          details: "50 MB Storage | Basic Features",
-        }}
-      /> */}
- 
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <h1 className="text-xl font-inter font-semibold mb-4">Hello, {name} 👋</h1>
-          <StorageUsage
-            label="Total Space"
-            value={`${storageData.total} MB`}
-            total={storageData.total}
-            used={storageData.total}
-          />
-
-          <StorageUsage
-            label="Remaining Space"
-            value={`${storageData.remaining} MB`}
-            total={storageData.total}
-            used={storageData.remaining}
-          />
-
-          <StorageUsage
-            label="Used Space"
-            value={`${storageData.used} MB`}
-            total={storageData.total}
-            used={storageData.used}
-          />
-        </div>
-
-        <div className="bg-[#FCFCFF] rounded-3xl border flex items-center justify-center max-h-[500px]">
-          <CircularProgress percentage={percentageUsed.toFixed(1)} />
-        </div>
+    <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="mb-6">
+        <h1 className="text-xl font-semibold text-gray-900">
+          {greetingForNow()}
+          {name ? `, ${name.split(" ")[0]}` : ""} 👋
+        </h1>
+        <p className="text-sm text-gray-400 mt-0.5">{today}</p>
       </div>
-      <RecentFiles/>
+
+      {loading ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <SkeletonCard className="lg:col-span-2" />
+          <SkeletonCard />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+          <div className="lg:col-span-2">
+            {planData ? (
+              <UsagePanel planName={planData.plan.name} usage={planData.usage} />
+            ) : (
+              <section className="h-full bg-white border border-gray-200 rounded-2xl p-6 flex items-center text-sm text-gray-500">
+                Usage information is unavailable right now. Refresh to try again.
+              </section>
+            )}
+          </div>
+          {storageData ? (
+            <StorageCard usedMb={storageData.usedMb} totalMb={storageData.totalMb} />
+          ) : (
+            <section className="h-full bg-white border border-gray-200 rounded-2xl p-6 flex items-center text-sm text-gray-500">
+              Storage information is unavailable right now. Refresh to try again.
+            </section>
+          )}
+        </div>
+      )}
+
+      <RecentFiles />
     </div>
   );
 };

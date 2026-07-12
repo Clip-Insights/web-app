@@ -155,9 +155,11 @@ const RecentFiles = () => {
     }
 
     return (
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        // Sized by the parent (Dashboard) container so the section aligns
+        // with the cards above instead of centering itself independently.
+        <div className="w-full mt-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
-                <h2 className="text-lg sm:text-xl font-semibold">Recent Files</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Recent Files</h2>
                 <button 
                     onClick={viewFilesPage}
                     className="w-full sm:w-auto px-3 py-2 bg-customPrimary text-white rounded-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors"

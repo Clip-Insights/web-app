@@ -1,84 +1,215 @@
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "react-toastify";
-import { Check, Zap } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
+import { Check, NotebookPen, Sparkles } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { fetchMyPlan, fetchPlans, formatStorage } from '../../services/planService';
 import {
   cancelSubscription,
   createCheckout,
-  getBillingCatalog,
-  getMyPlan,
-  getPlans,
-  getSubscription,
-} from "../../services/billingService";
-import { openCheckout } from "../../services/paddle";
-import Loader from "../../components/Loader/Loader";
+  fetchBillingCatalog,
+  fetchSubscription,
+} from '../../services/billingService';
+import { openCheckout } from '../../services/paddle';
 
-const gb = (mb) => (mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`);
+/**
+ * Every number on this page is fetched from the backend plan catalogue —
+ * the same rows the API enforces — so pricing can never drift from reality.
+ * Paid plans check out through Paddle (overlay); the plan activates when the
+ * subscription webhook lands.
+ */
 
-// Human-readable highlights derived from the plan's limit values.
-const planFeatures = (plan) => [
-  `${plan.daily_summaries} AI summaries / day`,
-  `${plan.daily_chat_messages} AI chat messages / day`,
-  `${gb(plan.storage_limit_mb)} PDF storage`,
-  `Files up to ${plan.max_file_size_mb} MB`,
-  `${plan.max_screenshots_per_video} screenshots / video`,
-  `Transcript context up to ${Math.round(plan.transcript_token_budget / 1000)}K tokens`,
-];
+const PAID_CTA_NOTE = 'Checkout is on its way — paid plans open soon.';
+
+function limitRows(plan) {
+  return [
+    { label: 'AI summaries + key points', value: `${plan.daily_summaries} / day` },
+    { label: 'AI chat messages', value: `${plan.daily_chat_messages} / day` },
+    { label: 'Video context per request', value: `${(plan.transcript_token_budget / 1000).toFixed(0)}k tokens` },
+    { label: 'Cloud storage for PDFs', value: formatStorage(plan.storage_limit_mb) },
+    { label: 'Largest single file', value: formatStorage(plan.max_file_size_mb) },
+    { label: 'Note length', value: `${plan.max_note_chars.toLocaleString()} characters` },
+    { label: 'Notes per video', value: plan.max_notes_per_video.toLocaleString() },
+    { label: 'Screenshots per video', value: plan.max_screenshots_per_video.toLocaleString() },
+  ];
+}
+
+function PlanCard({
+  plan,
+  purchase,
+  cycle,
+  highlighted,
+  currentSlug,
+  isAuthenticated,
+  subscription,
+  busy,
+  onUpgrade,
+  onCancel,
+}) {
+  const isCurrent = currentSlug === plan.slug;
+  const isPaid = plan.monthly_price_usd > 0;
+  const monthly = Number(plan.monthly_price_usd);
+  const annual = purchase ? Number(purchase.annual_price_usd) : null;
+  const showAnnual = cycle === 'annual' && isPaid && annual;
+  const shownPrice = showAnnual ? annual / 12 : monthly;
+  // Paid plans are purchasable only once the backend has synced them to Paddle.
+  const purchasable = isPaid && purchase;
+
+  return (
+    <div
+      className={`relative flex flex-col rounded-3xl bg-[#FCFCFF] p-6 sm:p-8 ${
+        highlighted
+          ? 'border-2 border-customPrimary shadow-lg'
+          : 'border border-gray-200'
+      }`}
+    >
+      {highlighted && (
+        <span
+          className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold text-white"
+          style={{ background: 'linear-gradient(to right, #3E4FFD 0%, #8000BB 100%)' }}
+        >
+          Most popular
+        </span>
+      )}
+
+      <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">{plan.name}</span>
+      <div className="mt-2 flex items-baseline gap-1">
+        <span className="text-4xl font-bold text-gray-800">
+          {isPaid ? `$${+shownPrice.toFixed(2)}` : '$0'}
+        </span>
+        <span className="text-sm text-gray-500">/ month</span>
+      </div>
+      {showAnnual && (
+        <p className="text-xs font-medium text-green-600 mt-1">billed ${annual} per year — 2 months free</p>
+      )}
+      <p className="mt-2 text-sm text-gray-500 min-h-[40px]">{plan.description}</p>
+
+      <div className="mt-4 mb-6">
+        {isCurrent ? (
+          <div>
+            <span className="block w-full text-center py-2.5 rounded-lg border border-customPrimary text-customPrimary font-medium text-sm">
+              Your current plan
+            </span>
+            {isPaid && subscription?.status === 'active' && !subscription?.cancel_at_period_end && (
+              <button
+                onClick={onCancel}
+                className="mt-2 w-full text-center text-xs text-gray-400 hover:text-red-500 underline"
+              >
+                Cancel subscription (keeps access until period end)
+              </button>
+            )}
+            {isPaid && subscription?.cancel_at_period_end && (
+              <p className="mt-2 text-xs text-center text-amber-600">
+                Ends {new Date(subscription.current_period_end).toLocaleDateString()} — will not renew
+              </p>
+            )}
+          </div>
+        ) : purchasable ? (
+          <button
+            onClick={() => onUpgrade(plan)}
+            disabled={busy}
+            className={`block w-full py-2.5 rounded-lg font-medium text-sm transition-colors text-white ${
+              busy
+                ? 'bg-gray-300 cursor-wait'
+                : 'bg-customPrimary hover:bg-customPrimaryHover'
+            }`}
+          >
+            {busy ? 'Opening checkout…' : `Upgrade to ${plan.name}`}
+          </button>
+        ) : isPaid ? (
+          <button
+            disabled
+            title={PAID_CTA_NOTE}
+            className="block w-full py-2.5 rounded-lg bg-gray-200 text-gray-500 font-medium text-sm cursor-not-allowed"
+          >
+            Coming soon
+          </button>
+        ) : (
+          <Link
+            to="/signup"
+            className="block w-full text-center py-2.5 rounded-lg bg-customPrimary hover:bg-customPrimaryHover text-white font-medium text-sm transition-colors"
+          >
+            {isAuthenticated ? 'Included with your account' : 'Create free account'}
+          </Link>
+        )}
+      </div>
+
+      <ul className="space-y-2.5 text-sm">
+        {limitRows(plan).map((row) => (
+          <li key={row.label} className="flex items-start justify-between gap-3">
+            <span className="flex items-center gap-2 text-gray-600">
+              <Check className="w-4 h-4 text-customPrimary shrink-0" />
+              {row.label}
+            </span>
+            <span className="font-semibold text-gray-800 whitespace-nowrap tabular-nums">{row.value}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const Pricing = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, authRequest } = useAuth();
   const navigate = useNavigate();
-  const [plans, setPlans] = useState([]);
+  const [plans, setPlans] = useState(null);
   const [catalog, setCatalog] = useState({});
-  const [myPlan, setMyPlan] = useState(null);
+  const [currentSlug, setCurrentSlug] = useState(null);
   const [subscription, setSubscription] = useState(null);
-  const [cycle, setCycle] = useState("monthly");
-  const [loading, setLoading] = useState(true);
+  const [cycle, setCycle] = useState('monthly');
   const [busyPlan, setBusyPlan] = useState(null);
+  const [error, setError] = useState(false);
 
   const refreshMine = useCallback(async () => {
     if (!isAuthenticated) return;
     try {
-      const [mine, sub] = await Promise.all([getMyPlan(), getSubscription()]);
-      setMyPlan(mine);
-      setSubscription(sub);
-    } catch {
-      /* not fatal for the pricing page */
+      const mine = await fetchMyPlan(authRequest);
+      setCurrentSlug(mine?.plan?.slug ?? null);
+      setSubscription(await fetchSubscription(authRequest));
+    } catch (e) {
+      console.error('Failed to load current plan:', e);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authRequest]);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    async function load() {
+      setError(false);
       try {
-        const [planList, catalogList] = await Promise.all([getPlans(), getBillingCatalog()]);
-        // Guests aren't a sellable tier; the pricing page shows account plans.
-        setPlans(planList.filter((p) => p.slug !== "guest"));
-        setCatalog(Object.fromEntries(catalogList.map((c) => [c.plan_slug, c])));
-        await refreshMine();
-      } catch (error) {
-        toast.error(error.message);
-      } finally {
-        setLoading(false);
+        const catalogue = await fetchPlans();
+        if (cancelled) return;
+        setPlans(catalogue);
+        // Purchase metadata is optional: without it, paid plans simply show
+        // "Coming soon" instead of a checkout button.
+        try {
+          const purchases = await fetchBillingCatalog();
+          if (!cancelled) setCatalog(Object.fromEntries(purchases.map((c) => [c.plan_slug, c])));
+        } catch (e) {
+          console.error('Billing catalog unavailable:', e);
+        }
+        if (isAuthenticated && !cancelled) await refreshMine();
+      } catch (e) {
+        console.error('Failed to load pricing:', e);
+        if (!cancelled) setError(true);
       }
-    })();
-  }, [refreshMine]);
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, refreshMine]);
 
-  const currentSlug = myPlan?.plan?.slug || (isAuthenticated ? "free" : null);
-
-  const handleSelect = async (plan) => {
+  const handleUpgrade = async (plan) => {
     if (!isAuthenticated) {
-      navigate(plan.monthly_price_usd > 0 ? "/login" : "/signup");
+      navigate('/login');
       return;
     }
-    if (plan.monthly_price_usd === 0 || plan.slug === currentSlug) return;
-
     setBusyPlan(plan.slug);
     try {
-      const config = await createCheckout(plan.slug, cycle);
+      const config = await createCheckout(authRequest, plan.slug, cycle);
       await openCheckout(config, {
         onSuccess: () => {
-          toast.success("Payment successful! Activating your plan…");
+          toast.success('Payment successful! Activating your plan…');
           // The webhook activates the plan; poll briefly until it lands.
           let attempts = 0;
           const poll = setInterval(async () => {
@@ -88,8 +219,8 @@ const Pricing = () => {
           }, 2000);
         },
       });
-    } catch (error) {
-      toast.error(error.message);
+    } catch (e) {
+      toast.error(e.response?.data?.error || e.response?.data?.detail || e.message || 'Could not start checkout');
     } finally {
       setBusyPlan(null);
     }
@@ -97,167 +228,111 @@ const Pricing = () => {
 
   const handleCancel = async () => {
     try {
-      const result = await cancelSubscription();
-      toast.success(result.msg);
+      const result = await cancelSubscription(authRequest);
+      toast.success(result.msg || 'Subscription will end at the current period.');
       await refreshMine();
-    } catch (error) {
-      toast.error(error.message);
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Cancellation failed. Try again.');
     }
   };
 
-  if (loading) return <Loader />;
+  const guest = plans?.find((p) => p.slug === 'guest');
+  const purchasable = plans?.filter((p) => p.slug !== 'guest') ?? [];
+  const hasPurchases = Object.keys(catalog).length > 0;
 
   return (
-    <div className="px-4 py-10 max-w-6xl mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">Plans &amp; Pricing</h1>
-        <p className="text-gray-500 mt-2">
-          AI summaries, key points and chat for every video you study.
+    <div className="container mx-auto px-4 py-10 max-w-6xl">
+      <div className="text-center mb-10">
+        <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">Start free. Upgrade when you need more.</h1>
+        <p className="mt-3 text-gray-500 text-sm sm:text-base">
+          Daily AI limits reset on a rolling 24-hour window.
         </p>
 
-        {/* Billing cycle toggle */}
-        <div className="inline-flex items-center bg-gray-100 rounded-full p-1 mt-6">
-          {["monthly", "annual"].map((option) => (
-            <button
-              key={option}
-              onClick={() => setCycle(option)}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
-                cycle === option ? "bg-white shadow text-gray-900" : "text-gray-500"
-              }`}
-            >
-              {option === "monthly" ? "Monthly" : "Annual"}
-              {option === "annual" && (
-                <span className="ml-1 text-green-600 font-semibold">2 months free</span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        {plans.map((plan) => {
-          const purchase = catalog[plan.slug];
-          const isCurrent = plan.slug === currentSlug;
-          const isPro = plan.slug === "pro";
-          const monthly = Number(plan.monthly_price_usd);
-          const annual = purchase ? Number(purchase.annual_price_usd) : monthly * 10;
-          const shownPrice = cycle === "monthly" ? monthly : annual / 12;
-
-          return (
-            <div
-              key={plan.slug}
-              className={`relative bg-white rounded-2xl shadow p-6 flex flex-col border-2 ${
-                isPro ? "border-blue-600" : "border-transparent"
-              }`}
-            >
-              {isPro && (
-                <span className="absolute -top-3 left-6 bg-blue-600 text-white text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">
-                  <Zap size={12} /> Most popular
-                </span>
-              )}
-
-              <h2 className="text-xl font-semibold text-gray-800">{plan.name}</h2>
-              <p className="text-sm text-gray-500 mt-1 min-h-[40px]">{plan.description}</p>
-
-              <div className="mt-3 flex items-baseline gap-1">
-                <span className="text-4xl font-bold text-gray-900">
-                  ${monthly === 0 ? 0 : +shownPrice.toFixed(2)}
-                </span>
-                <span className="text-gray-500 text-sm">/ month</span>
-              </div>
-              {monthly > 0 && cycle === "annual" && (
-                <p className="text-xs text-green-600 mt-1">billed ${annual} per year</p>
-              )}
-
-              <ul className="mt-5 pt-4 border-t border-gray-100 space-y-2 flex-grow">
-                {planFeatures(plan).map((feature) => (
-                  <li key={feature} className="flex items-start gap-2 text-sm text-gray-600">
-                    <Check size={16} className="text-green-500 mt-0.5 shrink-0" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-
+        {hasPurchases && (
+          <div className="inline-flex items-center bg-gray-100 rounded-full p-1 mt-6">
+            {['monthly', 'annual'].map((option) => (
               <button
-                onClick={() => handleSelect(plan)}
-                disabled={isCurrent || busyPlan === plan.slug}
-                className={`mt-6 w-full py-2.5 rounded-lg font-medium transition-colors ${
-                  isCurrent
-                    ? "bg-gray-100 text-gray-400 cursor-default"
-                    : isPro
-                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                      : monthly === 0
-                        ? "bg-gray-100 text-gray-500"
-                        : "bg-gray-800 text-white hover:bg-gray-900"
+                key={option}
+                onClick={() => setCycle(option)}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+                  cycle === option ? 'bg-white shadow text-gray-900' : 'text-gray-500'
                 }`}
               >
-                {isCurrent
-                  ? "Current plan"
-                  : busyPlan === plan.slug
-                    ? "Opening checkout…"
-                    : monthly === 0
-                      ? isAuthenticated
-                        ? "Included"
-                        : "Sign up free"
-                      : `Upgrade to ${plan.name}`}
+                {option === 'monthly' ? 'Monthly' : 'Annual'}
+                {option === 'annual' && (
+                  <span className="ml-1 text-green-600 font-semibold">2 months free</span>
+                )}
               </button>
-            </div>
-          );
-        })}
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Current usage + cancellation for signed-in users */}
-      {myPlan?.usage && (
-        <div className="mt-10 bg-white rounded-2xl shadow p-6 max-w-2xl mx-auto">
-          <h3 className="font-semibold text-gray-800 mb-3">
-            Your usage (rolling 24 hours) — {myPlan.plan.name} plan
-          </h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <UsageBar label="Summaries" usage={myPlan.usage.summary} />
-            <UsageBar label="Chat messages" usage={myPlan.usage.chat} />
-          </div>
-          {subscription?.status === "active" && !subscription?.cancel_at_period_end && (
-            <button
-              onClick={handleCancel}
-              className="mt-5 text-sm text-red-500 hover:text-red-600 underline"
-            >
-              Cancel subscription (keeps access until period end)
-            </button>
-          )}
-          {subscription?.cancel_at_period_end && (
-            <p className="mt-5 text-sm text-amber-600">
-              Your subscription ends on{" "}
-              {new Date(subscription.current_period_end).toLocaleDateString()} and will not renew.
-            </p>
-          )}
+      {error && (
+        <div className="text-center py-16">
+          <p className="text-gray-600">Plans couldn&apos;t be loaded. Check your connection and try again.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 rounded-lg bg-customPrimary hover:bg-customPrimaryHover text-white text-sm font-medium"
+          >
+            Retry
+          </button>
         </div>
       )}
-    </div>
-  );
-};
 
-const UsageBar = ({ label, usage }) => {
-  if (!usage) return null;
-  const { used, limit, resets_at } = usage;
-  const percent = Math.min(100, limit ? (used / limit) * 100 : 0);
-  return (
-    <div>
-      <div className="flex justify-between text-gray-600 mb-1">
-        <span>{label}</span>
-        <span>
-          {used} / {limit}
-        </span>
-      </div>
-      <div className="w-full h-2 bg-gray-100 rounded-full">
-        <div
-          className={`h-2 rounded-full ${percent >= 100 ? "bg-red-500" : "bg-blue-600"}`}
-          style={{ width: `${percent}%` }}
-        ></div>
-      </div>
-      {percent >= 100 && resets_at && (
-        <p className="text-xs text-gray-400 mt-1">
-          resets {new Date(resets_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-        </p>
+      {!plans && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-96 bg-gray-100 rounded-3xl border" />
+          ))}
+        </div>
+      )}
+
+      {plans && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+            {purchasable.map((plan) => (
+              <PlanCard
+                key={plan.slug}
+                plan={plan}
+                purchase={catalog[plan.slug]}
+                cycle={cycle}
+                highlighted={plan.slug === 'pro'}
+                currentSlug={currentSlug}
+                isAuthenticated={isAuthenticated}
+                subscription={currentSlug === plan.slug ? subscription : null}
+                busy={busyPlan === plan.slug}
+                onUpgrade={handleUpgrade}
+                onCancel={handleCancel}
+              />
+            ))}
+          </div>
+
+          {guest && (
+            <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                <NotebookPen className="w-5 h-5 text-customPrimary" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-sm font-semibold text-gray-800">Just browsing? No account needed.</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Take notes up to {guest.max_note_chars.toLocaleString()} characters ({guest.max_notes_per_video} per
+                  video), capture {guest.max_screenshots_per_video} screenshots per video and download your PDF — all
+                  in your browser, free forever. AI features unlock the moment you sign up.
+                </p>
+              </div>
+              {!isAuthenticated && (
+                <Link
+                  to="/signup"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-customPrimary hover:text-customPrimaryHover whitespace-nowrap"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Unlock AI free
+                </Link>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -220,7 +220,9 @@ const Files = () => {
         showAlert("File uploaded successfully", "success");
       } catch (error) {
         console.error("Error uploading file:", error);
-        showAlert("Failed to upload file", "error");
+        // Plan-limit rejections (429) carry a user-facing message from the backend.
+        const detail = error.response?.data;
+        showAlert(detail?.message || detail?.error || "Failed to upload file", "error");
       } finally {
         setLoading(false);
       }
