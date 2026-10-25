@@ -1,8 +1,7 @@
-import React from 'react';
 
 const Contact = () => {
   const handleButtonClick = () => {
-    window.open('https://clipinsights.com/contact/', '_blank');
+    window.open('https://clipinsights.org/contact/', '_blank', 'noopener,noreferrer');
   };
 
   return (
