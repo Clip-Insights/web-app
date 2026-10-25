@@ -10,6 +10,16 @@ export default {
         "92vh": "92vh",
       },
       colors: {
+        auth: {
+          ink: "#26283b",
+          muted: "#606478",
+          line: "#dfe2ed",
+          field: "#858da3",
+          panel: "#f5f5fc",
+          accent: "#4255ff",
+          hover: "#3343dc",
+          olive: "#e6eadc",
+        },
         customPrimary: "#3E4FFD",
         customPrimaryHover: "#3947e9",
         customPrimaryDark: "#4255aa",

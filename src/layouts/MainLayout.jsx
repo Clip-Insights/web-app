@@ -64,7 +64,7 @@ function MainLayout() {
             packagePlan={packagePlan}
           />
         )}
-        <main className="flex-1 p-4 pt-0 sm:p-6 md:p-8">
+        <main className={['/login', '/signup'].includes(location.pathname) ? 'flex-1' : 'flex-1 p-4 pt-0 sm:p-6 md:p-8'}>
           <Outlet />
         </main>
       </div>

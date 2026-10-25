@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-import signup_png from "/images/signup.png";
+import { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../../services/Utils";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import AuthLayout from "../../components/Auth/AuthLayout";
+import AuthField from "../../components/Auth/AuthField";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { getApiUrl } from "../../services/apiService";
 import { useAuth } from "../../context/AuthContext";
 import { GoogleLogin } from "@react-oauth/google";
@@ -22,13 +24,14 @@ const Signup = () => {
 
     // Validation checks
     if (!email || !password || !confirmPassword || !fullName) {
+      setLoading(false);
       return handleError("Please fill in all fields");
     }
     const passwordRegex = /^(?=.*\d).{8,}$/;
     if (!passwordRegex.test(password)) {
       setLoading(false);
       return handleError(
-        "Password must be at least 8 characters long and contain both letters and numbers"
+        "Password must be at least 8 characters long and include a number"
       );
     }
     if (password !== confirmPassword) {
@@ -108,119 +111,30 @@ const Signup = () => {
   };
 
   return (
-    <div className="flex flex-col w-full md:flex-row justify-around items-center min-h-92vh p-8">
-      {/* Image Section */}
-      <div className="hidden md:flex w-full max-w-md h-96 justify-center items-center">
-        <img
-          src={signup_png}
-          alt="Signup Illustration"
-          className="rounded-lg max-w-full h-full object-cover"
-        />
+    <AuthLayout>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Make room for your ideas.</h1>
+        <p className="mt-3 text-sm leading-6 text-auth-muted">Create your account. Keep your learning close.</p>
       </div>
-
-      {/* Signup Form */}
-      <div className="w-full max-w-md mr-8 mb-8 md:mb-0">
-        <h2 className="text-3xl font-bold mb-6 text-gray-800">
-          Register for Clip Insights!
-        </h2>
-        <form onSubmit={handleSignup}>
-          {/* Full Name Input */}
-          <div className="mb-6">
-            <label htmlFor="fullName" className="block text-gray-700 mb-2">
-              Full Name
-            </label>
-            <input
-              type="text"
-              id="fullName"
-              placeholder="Your full name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f4cbb3] focus:border-transparent"
-            />
-          </div>
-
-          {/* Email Input */}
-          <div className="mb-6">
-            <label htmlFor="email" className="block text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              placeholder="email@gmail.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f4cbb3] focus:border-transparent"
-            />
-          </div>
-
-          {/* Password Input */}
-          <div className="mb-6">
-            <label htmlFor="password" className="block text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f4cbb3] focus:border-transparent"
-            />
-          </div>
-
-          {/* Confirm Password Input */}
-          <div className="mb-6">
-            <label
-              htmlFor="confirmPassword"
-              className="block text-gray-700 mb-2"
-            >
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              id="confirmPassword"
-              placeholder="Confirm your password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f4cbb3] focus:border-transparent"
-            />
-          </div>
-
-          {/* Signup Button */}
-          <button
-            type="submit"
-            className="w-full bg-customPrimary hover:bg-customPrimaryHover text-white py-3 rounded-md text-lg focus:outline-none transition duration-300"
-          >
-            {loading ? "Signing Up..." : "Sign Up"}
+      <form onSubmit={handleSignup} aria-label="Create account">
+        <fieldset disabled={loading} className="space-y-4">
+          <AuthField label="Full name" id="fullName" autoComplete="name" placeholder="Your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <AuthField label="Email address" id="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <AuthField label="Password" id="password" type="password" autoComplete="new-password" placeholder="Create a password" hint="Use at least 8 characters, including a number." value={password} onChange={(e) => setPassword(e.target.value)} />
+          <AuthField label="Confirm password" id="confirmPassword" type="password" autoComplete="new-password" placeholder="Re-enter your password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+          <button type="submit" disabled={loading} aria-busy={loading} className="flex min-h-12 w-full items-center justify-center gap-3 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white transition-colors hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-auth-accent disabled:cursor-wait disabled:opacity-60">
+            {loading ? <><LoaderCircle size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />Creating account…</> : <>Create account<ArrowRight size={18} aria-hidden="true" /></>}
           </button>
-        </form>
-        <ToastContainer />
-
-        <div className="my-4 flex items-center">
-          <div className="flex-grow border-t border-gray-300"></div>
-          <span className="mx-4 text-gray-500">OR</span>
-          <div className="flex-grow border-t border-gray-300"></div>
-        </div>
-        <div className="flex justify-center">
-          <GoogleLogin
-            text="signup_with"
-            onSuccess={handleGoogleSignup}
-            onError={() => {
-              handleError("Google signup failed");
-            }}
-          />
-        </div>
-
-        {/* Login Link */}
-        <p className="mt-6 text-gray-700 text-sm">
-          Already have an account?{" "}
-          <a href="/login" className="text-customPrimary hover:underline">
-            Login
-          </a>
-        </p>
+        </fieldset>
+      </form>
+      <p className="mt-4 text-xs leading-5 text-auth-muted">By creating an account, you agree to our <a href="https://clipinsights.org/terms" className="rounded underline underline-offset-2 hover:text-auth-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Terms</a> and <a href="https://clipinsights.org/privacy" className="rounded underline underline-offset-2 hover:text-auth-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Privacy Policy</a>.</p>
+      <div className="my-6 flex items-center gap-4 text-xs text-auth-muted"><span className="h-px flex-1 bg-auth-line" /><span>or continue with</span><span className="h-px flex-1 bg-auth-line" /></div>
+      <div className="flex min-h-11 justify-center">
+        <GoogleLogin size="large" shape="rectangular" text="signup_with" width="256" onSuccess={handleGoogleSignup} onError={() => handleError("Google signup failed")} />
       </div>
-    </div>
+      <p className="mt-6 text-center text-sm text-auth-muted">Already have an account? <Link to="/login" className="rounded font-semibold text-auth-accent underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Sign in</Link></p>
+      <ToastContainer />
+    </AuthLayout>
   );
 };
 

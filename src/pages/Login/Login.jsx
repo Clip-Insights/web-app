@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-import login_png from "/images/login.png";
+import { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../../services/Utils";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import AuthLayout from "../../components/Auth/AuthLayout";
+import AuthField from "../../components/Auth/AuthField";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { getApiUrl } from "../../services/apiService";
 import { useAuth } from "../../context/AuthContext";
 import { GoogleLogin } from '@react-oauth/google';
@@ -42,16 +44,16 @@ const Login = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // AuthContext encrypts once on store — don't encrypt here.
+        // AuthContext handles token encryption.
         login({ access: data.token.access, refresh: data.token.refresh });
-        
+
         handleSuccess("Login successful!");
         setTimeout(() => {
           navigate('/');
         }, 1500);
       } else {
-        const errorMessage = data.errors?.non_field_errors?.[0] || 
-                           data.message || 
+        const errorMessage = data.errors?.non_field_errors?.[0] ||
+                           data.message ||
                            "An unknown error occurred. Please try again.";
         handleError(errorMessage);
       }
@@ -75,7 +77,7 @@ const Login = () => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         login({ access: data.token.access, refresh: data.token.refresh });
         handleSuccess("Google login successful!");
@@ -92,94 +94,30 @@ const Login = () => {
   };
 
   return (
-    <div className="flex flex-col w-full lg:flex-row justify-around items-center min-h-92vh p-4 md:p-8">
-      {/* Login Form */}
-      <div className="w-full max-w-md lg:mr-8 mb-8 lg:mb-0">
-        <h2 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6 text-gray-800">
-          Welcome to Clip Insights!
-        </h2>
-        <form onSubmit={handleLogin}>
-          {/* Email Input */}
-          <div className="mb-4 md:mb-6">
-            <label htmlFor="email" className="block text-gray-700 mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              id="email"
-              placeholder="email@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 md:px-4 py-2 md:py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f4cbb3] focus:border-transparent"
-            />
+    <AuthLayout>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold tracking-tight">Welcome back.</h1>
+        <p className="mt-3 text-sm leading-6 text-auth-muted">Your notes, your ideas, your next study session.</p>
+      </div>
+      <form onSubmit={handleLogin} aria-label="Sign in">
+        <fieldset disabled={loading} className="space-y-5">
+          <AuthField label="Email address" id="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <AuthField label="Password" id="password" type="password" autoComplete="current-password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <div className="flex justify-end">
+            <Link to="/reset-password" className="rounded text-sm text-auth-muted underline-offset-4 hover:text-auth-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Forgot password?</Link>
           </div>
-
-          {/* Password Input */}
-          <div className="mb-4 md:mb-6">
-            <label htmlFor="password" className="block text-gray-700 mb-2">
-              Password
-            </label>
-            <input
-              type="password"
-              id="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 md:px-4 py-2 md:py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f4cbb3] focus:border-transparent"
-            />
-            <a
-              href="/reset-password"
-              className="text-sm text-gray-500 mt-2 inline-block hover:text-customPrimary"
-            >
-              Forgot Password?
-            </a>
-          </div>
-
-          {/* Login Button */}
-          <button
-            type="submit"
-            className="w-full bg-customPrimary hover:bg-customPrimaryHover text-white py-2 md:py-3 rounded-md text-base md:text-lg focus:outline-none transition duration-300"
-            disabled={loading}
-          >
-            {loading ? "Logging In..." : "Login"}
+          <button type="submit" disabled={loading} aria-busy={loading} className="flex min-h-12 w-full items-center justify-center gap-3 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white transition-colors hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-auth-accent disabled:cursor-wait disabled:opacity-60">
+            {loading ? <><LoaderCircle size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />Signing in…</> : <>Sign in<ArrowRight size={18} aria-hidden="true" /></>}
           </button>
-        </form>
-        <ToastContainer />
-
-        {/* Sign up Link */}
-        <p className="mt-4 md:mt-6 text-gray-700 text-sm">
-          Don't have an account?{" "}
-          <a href="/signup" className="text-customPrimary hover:underline">
-            Sign Up
-          </a>
-        </p>
-
-        <div className="w-full max-w-md">
-          <div className="my-4 flex items-center">
-            <div className="flex-grow border-t border-gray-300"></div>
-            <span className="mx-4 text-gray-500">OR</span>
-            <div className="flex-grow border-t border-gray-300"></div>
-          </div>
-          <div className="flex justify-center">
-            <GoogleLogin
-              onSuccess={handleGoogleLogin}
-              onError={() => {
-                handleError("Google login failed");
-              }}
-            />
-          </div>
-        </div>
+        </fieldset>
+      </form>
+      <div className="my-6 flex items-center gap-4 text-xs text-auth-muted"><span className="h-px flex-1 bg-auth-line" /><span>or continue with</span><span className="h-px flex-1 bg-auth-line" /></div>
+      <div className="flex min-h-11 justify-center">
+        <GoogleLogin size="large" shape="rectangular" text="continue_with" width="256" onSuccess={handleGoogleLogin} onError={() => handleError("Google login failed")} />
       </div>
-
-      {/* Image Section - Hidden on mobile */}
-      <div className="hidden md:flex w-full max-w-md h-96 justify-center items-center">
-        <img
-          src={login_png}
-          alt="Login Illustration"
-          className="rounded-lg max-w-full h-full object-cover"
-        />
-      </div>
-    </div>
+      <p className="mt-8 text-center text-sm text-auth-muted">New to Clip Insights? <Link to="/signup" className="rounded font-semibold text-auth-accent underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Create an account</Link></p>
+      <ToastContainer />
+    </AuthLayout>
   );
 };
 
