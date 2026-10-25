@@ -1,12 +1,22 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { Check, NotebookPen, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMyPlan, fetchPlans, formatStorage } from '../../services/planService';
+import {
+  cancelSubscription,
+  createCheckout,
+  fetchBillingCatalog,
+  fetchSubscription,
+} from '../../services/billingService';
+import { openCheckout } from '../../services/paddle';
 
 /**
  * Every number on this page is fetched from the backend plan catalogue —
  * the same rows the API enforces — so pricing can never drift from reality.
+ * Paid plans check out through Paddle (overlay); the plan activates when the
+ * subscription webhook lands.
  */
 
 const PAID_CTA_NOTE = 'Checkout is on its way — paid plans open soon.';
@@ -24,9 +34,26 @@ function limitRows(plan) {
   ];
 }
 
-function PlanCard({ plan, highlighted, currentSlug, isAuthenticated }) {
+function PlanCard({
+  plan,
+  purchase,
+  cycle,
+  highlighted,
+  currentSlug,
+  isAuthenticated,
+  subscription,
+  busy,
+  onUpgrade,
+  onCancel,
+}) {
   const isCurrent = currentSlug === plan.slug;
   const isPaid = plan.monthly_price_usd > 0;
+  const monthly = Number(plan.monthly_price_usd);
+  const annual = purchase ? Number(purchase.annual_price_usd) : null;
+  const showAnnual = cycle === 'annual' && isPaid && annual;
+  const shownPrice = showAnnual ? annual / 12 : monthly;
+  // Paid plans are purchasable only once the backend has synced them to Paddle.
+  const purchasable = isPaid && purchase;
 
   return (
     <div
@@ -48,17 +75,47 @@ function PlanCard({ plan, highlighted, currentSlug, isAuthenticated }) {
       <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">{plan.name}</span>
       <div className="mt-2 flex items-baseline gap-1">
         <span className="text-4xl font-bold text-gray-800">
-          {isPaid ? `$${Number(plan.monthly_price_usd)}` : '$0'}
+          {isPaid ? `$${+shownPrice.toFixed(2)}` : '$0'}
         </span>
         <span className="text-sm text-gray-500">/ month</span>
       </div>
+      {showAnnual && (
+        <p className="text-xs font-medium text-green-600 mt-1">billed ${annual} per year — 2 months free</p>
+      )}
       <p className="mt-2 text-sm text-gray-500 min-h-[40px]">{plan.description}</p>
 
       <div className="mt-4 mb-6">
         {isCurrent ? (
-          <span className="block w-full text-center py-2.5 rounded-lg border border-customPrimary text-customPrimary font-medium text-sm">
-            Your current plan
-          </span>
+          <div>
+            <span className="block w-full text-center py-2.5 rounded-lg border border-customPrimary text-customPrimary font-medium text-sm">
+              Your current plan
+            </span>
+            {isPaid && subscription?.status === 'active' && !subscription?.cancel_at_period_end && (
+              <button
+                onClick={onCancel}
+                className="mt-2 w-full text-center text-xs text-gray-400 hover:text-red-500 underline"
+              >
+                Cancel subscription (keeps access until period end)
+              </button>
+            )}
+            {isPaid && subscription?.cancel_at_period_end && (
+              <p className="mt-2 text-xs text-center text-amber-600">
+                Ends {new Date(subscription.current_period_end).toLocaleDateString()} — will not renew
+              </p>
+            )}
+          </div>
+        ) : purchasable ? (
+          <button
+            onClick={() => onUpgrade(plan)}
+            disabled={busy}
+            className={`block w-full py-2.5 rounded-lg font-medium text-sm transition-colors text-white ${
+              busy
+                ? 'bg-gray-300 cursor-wait'
+                : 'bg-customPrimary hover:bg-customPrimaryHover'
+            }`}
+          >
+            {busy ? 'Opening checkout…' : `Upgrade to ${plan.name}`}
+          </button>
         ) : isPaid ? (
           <button
             disabled
@@ -94,9 +151,25 @@ function PlanCard({ plan, highlighted, currentSlug, isAuthenticated }) {
 
 const Pricing = () => {
   const { isAuthenticated, authRequest } = useAuth();
+  const navigate = useNavigate();
   const [plans, setPlans] = useState(null);
+  const [catalog, setCatalog] = useState({});
   const [currentSlug, setCurrentSlug] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+  const [cycle, setCycle] = useState('monthly');
+  const [busyPlan, setBusyPlan] = useState(null);
   const [error, setError] = useState(false);
+
+  const refreshMine = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const mine = await fetchMyPlan(authRequest);
+      setCurrentSlug(mine?.plan?.slug ?? null);
+      setSubscription(await fetchSubscription(authRequest));
+    } catch (e) {
+      console.error('Failed to load current plan:', e);
+    }
+  }, [isAuthenticated, authRequest]);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,10 +179,15 @@ const Pricing = () => {
         const catalogue = await fetchPlans();
         if (cancelled) return;
         setPlans(catalogue);
-        if (isAuthenticated) {
-          const mine = await fetchMyPlan(authRequest);
-          if (!cancelled) setCurrentSlug(mine?.plan?.slug ?? null);
+        // Purchase metadata is optional: without it, paid plans simply show
+        // "Coming soon" instead of a checkout button.
+        try {
+          const purchases = await fetchBillingCatalog();
+          if (!cancelled) setCatalog(Object.fromEntries(purchases.map((c) => [c.plan_slug, c])));
+        } catch (e) {
+          console.error('Billing catalog unavailable:', e);
         }
+        if (isAuthenticated && !cancelled) await refreshMine();
       } catch (e) {
         console.error('Failed to load pricing:', e);
         if (!cancelled) setError(true);
@@ -119,23 +197,80 @@ const Pricing = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, authRequest]);
+  }, [isAuthenticated, refreshMine]);
+
+  const handleUpgrade = async (plan) => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    setBusyPlan(plan.slug);
+    try {
+      const config = await createCheckout(authRequest, plan.slug, cycle);
+      await openCheckout(config, {
+        onSuccess: () => {
+          toast.success('Payment successful! Activating your plan…');
+          // The webhook activates the plan; poll briefly until it lands.
+          let attempts = 0;
+          const poll = setInterval(async () => {
+            attempts += 1;
+            await refreshMine();
+            if (attempts >= 5) clearInterval(poll);
+          }, 2000);
+        },
+      });
+    } catch (e) {
+      toast.error(e.response?.data?.error || e.response?.data?.detail || e.message || 'Could not start checkout');
+    } finally {
+      setBusyPlan(null);
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      const result = await cancelSubscription(authRequest);
+      toast.success(result.msg || 'Subscription will end at the current period.');
+      await refreshMine();
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Cancellation failed. Try again.');
+    }
+  };
 
   const guest = plans?.find((p) => p.slug === 'guest');
   const purchasable = plans?.filter((p) => p.slug !== 'guest') ?? [];
+  const hasPurchases = Object.keys(catalog).length > 0;
 
   return (
     <div className="container mx-auto px-4 py-10 max-w-6xl">
       <div className="text-center mb-10">
         <h1 className="text-3xl sm:text-4xl font-bold text-gray-800">Start free. Upgrade when you need more.</h1>
         <p className="mt-3 text-gray-500 text-sm sm:text-base">
-          Daily AI limits reset on a rolling 24-hour window. Prices are introductory while we finish checkout.
+          Daily AI limits reset on a rolling 24-hour window.
         </p>
+
+        {hasPurchases && (
+          <div className="inline-flex items-center bg-gray-100 rounded-full p-1 mt-6">
+            {['monthly', 'annual'].map((option) => (
+              <button
+                key={option}
+                onClick={() => setCycle(option)}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+                  cycle === option ? 'bg-white shadow text-gray-900' : 'text-gray-500'
+                }`}
+              >
+                {option === 'monthly' ? 'Monthly' : 'Annual'}
+                {option === 'annual' && (
+                  <span className="ml-1 text-green-600 font-semibold">2 months free</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && (
         <div className="text-center py-16">
-          <p className="text-gray-600">Plans couldn't be loaded. Check your connection and try again.</p>
+          <p className="text-gray-600">Plans couldn&apos;t be loaded. Check your connection and try again.</p>
           <button
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 rounded-lg bg-customPrimary hover:bg-customPrimaryHover text-white text-sm font-medium"
@@ -160,9 +295,15 @@ const Pricing = () => {
               <PlanCard
                 key={plan.slug}
                 plan={plan}
+                purchase={catalog[plan.slug]}
+                cycle={cycle}
                 highlighted={plan.slug === 'pro'}
                 currentSlug={currentSlug}
                 isAuthenticated={isAuthenticated}
+                subscription={currentSlug === plan.slug ? subscription : null}
+                busy={busyPlan === plan.slug}
+                onUpgrade={handleUpgrade}
+                onCancel={handleCancel}
               />
             ))}
           </div>
