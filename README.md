@@ -1,8 +1,8 @@
-# Clip Insights — Web App
+# Clip Insights · Web app
 
-React + Vite web app for [Clip Insights](https://github.com/Clip-Insights): the account dashboard where users sign in and manage the PDFs they export from the browser extension. It talks to the same [Clip Insights backend](https://github.com/Clip-Insights/backend) as the extension.
+The account and document dashboard for [Clip Insights](https://github.com/Clip-Insights). Sign in, find the PDFs saved from your video study sessions, organize them into folders, and track your storage and plan usage.
 
-> For contributor standards, coding conventions, and a fuller project overview, see **[AGENTS.md](./AGENTS.md)**.
+[Open web app](https://app.clipinsights.org) · [Website](https://clipinsights.org) · [Architecture](./ARCHITECTURE.md) · [System overview](https://github.com/Clip-Insights/.github/blob/main/docs/ARCHITECTURE.md)
 
 ## What it does
 
@@ -17,30 +17,32 @@ React + Vite web app for [Clip Insights](https://github.com/Clip-Insights): the 
 - **React 18 + Vite**, JavaScript/JSX (not TypeScript)
 - **TailwindCSS** for styling
 - **react-router-dom** for routing
-- **axios** through a single API client in `src/services/apiService.js`
+- **axios** and the Fetch API for backend requests; URL helpers in `src/services/apiService.js`
 - **@react-oauth/google** + `crypto-js` for auth and token handling
 - **react-toastify** (notifications), **lucide-react** (icons), **react-d3-speedometer** / **react-spinners** (dashboard widgets)
 - **ESLint** for linting (no test framework configured yet — see [AGENTS.md](./AGENTS.md))
 
 ## Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 22 and npm
 - A running [Clip Insights backend](https://github.com/Clip-Insights/backend) (local or deployed) to point `VITE_API_URL` at
 
 ## Setup
 
 ```bash
-npm install
+git clone https://github.com/Clip-Insights/web-app.git
+cd web-app
+npm ci
 ```
 
-Create a `.env` file (a `.env.production` is used for production builds):
+Create `.env.local` with a public Google OAuth client ID for local sign-in. For production builds, set both variables below; `.env.production.local` can hold local build configuration without changing the committed placeholders.
 
 | Variable | Purpose |
 |---|---|
-| `VITE_API_URL` | Base URL of the Clip Insights backend API |
+| `VITE_API_URL` | Production backend base URL, without `/api` or a trailing slash. Development uses `http://localhost:8000`. |
 | `VITE_GOOGLE_CLIENT_ID` | Google OAuth **Web application** client ID for Google sign-in |
 
-Config is read via `import.meta.env` — never hard-code the API URL or secrets.
+Vite embeds these values in the browser bundle. Use public configuration only; backend credentials belong on the server. See [Architecture](./ARCHITECTURE.md) for session handling and API configuration.
 
 ## Commands
 
@@ -67,7 +69,7 @@ src/
 
 **Conventions worth knowing** (full list in [AGENTS.md](./AGENTS.md)):
 
-- All HTTP goes through `src/services/apiService.js` — don't call `axios` directly from components.
+- API URLs are constructed by `getApiUrl` in `src/services/apiService.js`; authenticated requests use `AuthContext.authRequest`.
 - Auth is centralized in `src/context/AuthContext.jsx` — read auth state/actions from it; don't duplicate token logic.
 - Style with Tailwind utilities and the theme tokens in `tailwind.config.js`; avoid ad-hoc CSS files.
 - Surface API errors via `react-toastify` — never fail silently, never use `alert()`.
@@ -84,3 +86,6 @@ npm run build    # outputs a static bundle to dist/
 
 - **[backend](https://github.com/Clip-Insights/backend)** — the Django REST API this app calls
 - **[chrome-extension](https://github.com/Clip-Insights/chrome-extension)** — the browser extension that exports the PDFs managed here
+- **[main-site](https://github.com/Clip-Insights/main-site)** — the public website and product guides
+
+Contributor standards are in [AGENTS.md](./AGENTS.md).

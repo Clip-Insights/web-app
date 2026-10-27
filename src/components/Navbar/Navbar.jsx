@@ -33,9 +33,9 @@
 //     { href: "/", label: "Dashboard" },
 //     { href: "/userspace", label: "Files"},
 //     { href: "/folders", label: "Folders"},
-//     { href: "https://clipinsights.com/", label: "Product" },
-//     { href: "https://clipinsights.com/contact/", label: "Contact" },
-//     { href: "https://clipinsights.com/pricing/", label: "Pricing" },
+//     { href: "https://clipinsights.org/", label: "Product" },
+//     { href: "https://clipinsights.org/contact/", label: "Contact" },
+//     { href: "https://clipinsights.org/pricing/", label: "Pricing" },
 //     ...(isAuthenticated
 //       ? [{ label: "Logout", onClick: handleLogout }]
 //       : [
@@ -202,9 +202,9 @@
 //     { href: "/", label: "Dashboard" },
 //     { href: "/userspace", label: "Files"},
 //     { href: "/folders", label: "Folders"},
-//     { href: "https://clipinsights.com/", label: "Product" },
-//     { href: "https://clipinsights.com/contact/", label: "Contact" },
-//     { href: "https://clipinsights.com/pricing/", label: "Pricing" },
+//     { href: "https://clipinsights.org/", label: "Product" },
+//     { href: "https://clipinsights.org/contact/", label: "Contact" },
+//     { href: "https://clipinsights.org/pricing/", label: "Pricing" },
 //     ...(isAuthenticated
 //       ? [{ label: "Logout", onClick: handleLogout }]
 //       : [
