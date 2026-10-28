@@ -4,20 +4,7 @@ The [Clip Insights web app](https://app.clipinsights.org) is the account dashboa
 
 ## Application flow
 
-```mermaid
-flowchart TB
-    ROUTER["React Router<br/>Public and protected routes"]
-    AUTH["AuthContext<br/>Session and token refresh"]
-    PAGES["Pages<br/>Dashboard, files, folders, plans"]
-    SERVICES["Services<br/>API URLs, plans, billing"]
-    API["Clip Insights backend<br/>Django REST API"]
-    ROUTER --> AUTH
-    ROUTER --> PAGES
-    PAGES --> AUTH
-    PAGES --> SERVICES
-    AUTH --> API
-    SERVICES --> API
-```
+![Web app architecture](./docs/diagrams/web-app-architecture.svg)
 
 ## Code map
 

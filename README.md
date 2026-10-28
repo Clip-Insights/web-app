@@ -1,91 +1,44 @@
 # Clip Insights · Web app
 
-The account and document dashboard for [Clip Insights](https://github.com/Clip-Insights). Sign in, find the PDFs saved from your video study sessions, organize them into folders, and track your storage and plan usage.
+### Your video study library, in one place.
 
-[Open web app](https://app.clipinsights.org) · [Website](https://clipinsights.org) · [Architecture](./ARCHITECTURE.md) · [System overview](https://github.com/Clip-Insights/.github/blob/main/docs/ARCHITECTURE.md)
+Find the PDFs saved from your Clip Insights study sessions, organize them into folders, and keep track of your account.
 
-## What it does
+[Open web app](https://app.clipinsights.org) · [Website](https://clipinsights.org) · [Install extension](https://chromewebstore.google.com/detail/ccgechmifoecebnimnccgahnoklklilj)
 
-- **Auth** — email/password login and signup, Google sign-in, email verification, and password reset, all against the backend's `/api/account/` endpoints.
-- **Dashboard** — storage usage and account overview with gauge/widget visualizations.
-- **Files & folders** — browse, search, rename, move, and delete the PDFs exported from the extension; organize them into folders. Backed by the backend's S3-backed file storage.
-- **Plans / pricing** — view plan tiers and storage quotas.
-- **Static pages** — marketing / informational content.
+## What you can do
 
-## Tech stack
+| Your library | Your account |
+| --- | --- |
+| Browse and search saved PDFs. | Sign in with email or Google. |
+| Create folders, rename documents, and move files. | View storage usage and available space. |
+| Open or remove documents as your library grows. | Review plans, allowances, and subscription details. |
 
-- **React 18 + Vite**, JavaScript/JSX (not TypeScript)
-- **TailwindCSS** for styling
-- **react-router-dom** for routing
-- **axios** and the Fetch API for backend requests; URL helpers in `src/services/apiService.js`
-- **@react-oauth/google** + `crypto-js` for auth and token handling
-- **react-toastify** (notifications), **lucide-react** (icons), **react-d3-speedometer** / **react-spinners** (dashboard widgets)
-- **ESLint** for linting (no test framework configured yet — see [AGENTS.md](./AGENTS.md))
+## How it fits together
 
-## Prerequisites
+![From a saved study PDF to an organized document library](./docs/diagrams/web-app-overview.svg)
 
-- Node.js 22 and npm
-- A running [Clip Insights backend](https://github.com/Clip-Insights/backend) (local or deployed) to point `VITE_API_URL` at
+The extension creates the study PDF; this dashboard is where you find and organize it. Both use the same backend, so your saved documents, account, and plan information belong to one workspace.
 
-## Setup
+## Built with
+
+**React 18 · JavaScript · Vite · Tailwind CSS · React Router**
+
+A shared session layer handles sign-in and token renewal. Document storage, authorization, and account allowances are managed by the backend.
+
+## Run locally
+
+Use Node.js 22 and a configured Clip Insights backend. See the [development guide](./docs/DEVELOPMENT.md) for environment setup.
 
 ```bash
-git clone https://github.com/Clip-Insights/web-app.git
-cd web-app
 npm ci
+npm run dev
 ```
 
-Create `.env.local` with a public Google OAuth client ID for local sign-in. For production builds, set both variables below; `.env.production.local` can hold local build configuration without changing the committed placeholders.
+Use `npm run build` to create the static application bundle.
 
-| Variable | Purpose |
-|---|---|
-| `VITE_API_URL` | Production backend base URL, without `/api` or a trailing slash. Development uses `http://localhost:8000`. |
-| `VITE_GOOGLE_CLIENT_ID` | Google OAuth **Web application** client ID for Google sign-in |
+## Explore further
 
-Vite embeds these values in the browser bundle. Use public configuration only; backend credentials belong on the server. See [Architecture](./ARCHITECTURE.md) for session handling and API configuration.
+[Detailed architecture](./ARCHITECTURE.md) · [Development and verification](./docs/DEVELOPMENT.md) · [Contributing](./AGENTS.md)
 
-## Commands
-
-```bash
-npm run dev      # Vite dev server (http://localhost:5173)
-npm run build    # production build -> dist/
-npm run preview  # preview the production build locally
-npm run lint     # ESLint over the project
-```
-
-## Project structure
-
-```
-src/
-  pages/        # route screens: Dashboard, Files, Folders, Login, Signup,
-                # ResetPassword, VerifyEmail, Pricing, Static
-  components/    # reusable UI grouped by area (Cards, Dashboard, Header, Navbar, Sidebar, Loader)
-  layouts/       # page shells (with / without navbar)
-  context/       # React context providers (AuthContext)
-  services/      # apiService.js (axios client + endpoints) and helpers
-  routes/        # routes.jsx
-  utils/         # route metadata and helpers
-```
-
-**Conventions worth knowing** (full list in [AGENTS.md](./AGENTS.md)):
-
-- API URLs are constructed by `getApiUrl` in `src/services/apiService.js`; authenticated requests use `AuthContext.authRequest`.
-- Auth is centralized in `src/context/AuthContext.jsx` — read auth state/actions from it; don't duplicate token logic.
-- Style with Tailwind utilities and the theme tokens in `tailwind.config.js`; avoid ad-hoc CSS files.
-- Surface API errors via `react-toastify` — never fail silently, never use `alert()`.
-
-## Deployment
-
-The app is a static SPA and deploys to **Vercel**. `vercel.json` rewrites all routes to `index.html` so client-side routing works on deep links. Set `VITE_API_URL` and `VITE_GOOGLE_CLIENT_ID` as project environment variables in Vercel.
-
-```bash
-npm run build    # outputs a static bundle to dist/
-```
-
-## Related repositories
-
-- **[backend](https://github.com/Clip-Insights/backend)** — the Django REST API this app calls
-- **[chrome-extension](https://github.com/Clip-Insights/chrome-extension)** — the browser extension that exports the PDFs managed here
-- **[main-site](https://github.com/Clip-Insights/main-site)** — the public website and product guides
-
-Contributor standards are in [AGENTS.md](./AGENTS.md).
+Part of [Clip Insights](https://github.com/Clip-Insights): [Chrome extension](https://github.com/Clip-Insights/chrome-extension) · [backend](https://github.com/Clip-Insights/backend) · [public website](https://github.com/Clip-Insights/main-site).
