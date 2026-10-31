@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
+import SessionLoading from "../components/Loading/SessionLoading";
+import PropTypes from "prop-types";
 import { decryptToken, encryptToken, getApiUrl } from "../services/apiService";
 import { handleError, handleSuccess } from "../services/Utils";
 
@@ -15,7 +17,7 @@ function isTokenExpired(token) {
   if (!token) return true;
   try {
     const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return Date.now() >= payload.exp * 1000 - EXPIRY_BUFFER_MS;
+    return !Number.isFinite(payload.exp) || Date.now() >= payload.exp * 1000 - EXPIRY_BUFFER_MS;
   } catch {
     return true;
   }
@@ -24,6 +26,7 @@ function isTokenExpired(token) {
 // Auth Provider Component
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   // Single-flight refresh: concurrent 401s share one refresh call instead of
   // racing several (SimpleJWT would accept them all, but it's wasted round-trips).
@@ -34,6 +37,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const refreshToken = decryptToken(localStorage.getItem("refresh"));
     setIsAuthenticated(!isTokenExpired(refreshToken));
+    setSessionExpired(Boolean(refreshToken) && isTokenExpired(refreshToken));
     setIsLoading(false);
   }, []);
 
@@ -42,13 +46,16 @@ export function AuthProvider({ children }) {
       localStorage.setItem("access", encryptToken(tokens.access));
       localStorage.setItem("refresh", encryptToken(tokens.refresh));
       setIsAuthenticated(true);
+      setSessionExpired(false);
     }
   };
 
-  const clearSession = useCallback(() => {
+  const clearSession = useCallback((expired = false) => {
+    setSessionExpired(expired);
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
     setIsAuthenticated(false);
+    try { sessionStorage.removeItem('clipinsights-pending-activation'); } catch { /* Local sign-out still completes. */ }
   }, []);
 
   const logout = useCallback(async () => {
@@ -74,25 +81,30 @@ export function AuthProvider({ children }) {
   const refreshTokens = useCallback(() => {
     if (refreshInFlight.current) return refreshInFlight.current;
 
-    refreshInFlight.current = (async () => {
+    refreshInFlight.current = Promise.resolve().then(async () => {
       try {
         const refreshToken = decryptToken(localStorage.getItem("refresh"));
         if (!refreshToken || isTokenExpired(refreshToken)) {
-          throw new Error("No usable refresh token");
+          clearSession(true);
+          return null;
         }
         const response = await axios.post(getApiUrl("account/refresh-token/"), {
           refresh: refreshToken,
         });
         const { access } = response.data;
+        if (!access) throw new Error('The session could not be refreshed. Please try again.');
         localStorage.setItem("access", encryptToken(access));
         return access;
-      } catch {
-        clearSession();
-        return null;
+      } catch (error) {
+        if ([400, 401, 403].includes(error.response?.status)) {
+          clearSession(true);
+          return null;
+        }
+        throw error;
       } finally {
         refreshInFlight.current = null;
       }
-    })();
+    });
 
     return refreshInFlight.current;
   }, [clearSession]);
@@ -128,10 +140,14 @@ export function AuthProvider({ children }) {
         if (error.response?.status !== 401) throw error;
         const freshToken = await refreshTokens();
         if (!freshToken) throw error;
-        return send(freshToken);
+        try { return await send(freshToken); }
+        catch (retryError) {
+          if (retryError.response?.status === 401) clearSession(true);
+          throw retryError;
+        }
       }
     },
-    [ensureAccessToken, refreshTokens]
+    [ensureAccessToken, refreshTokens, clearSession]
   );
 
   return (
@@ -139,13 +155,14 @@ export function AuthProvider({ children }) {
       value={{
         isAuthenticated,
         isLoading,
+        sessionExpired,
         login,
         logout,
         refreshTokens,
         authRequest,
       }}
     >
-      {!isLoading && children}
+      {isLoading ? <SessionLoading /> : children}
     </AuthContext.Provider>
   );
 }
@@ -154,3 +171,5 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
+AuthProvider.propTypes = { children: PropTypes.node.isRequired };

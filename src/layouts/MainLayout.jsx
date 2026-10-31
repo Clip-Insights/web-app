@@ -14,7 +14,7 @@ function MainLayout() {
   const [planLoading, setPlanLoading] = useState(isAuthenticated);
 
   const hideSidebarRoutes = ['/login', '/signup', '/reset-password'];
-  const shouldHideSidebar = hideSidebarRoutes.includes(location.pathname);
+  const shouldHideSidebar = hideSidebarRoutes.includes(location.pathname) || location.pathname.startsWith('/reset-password/');
 
   // The header badge shows the user's real plan (from the backend), not a placeholder.
   useEffect(() => {
@@ -69,7 +69,7 @@ function MainLayout() {
             planLoading={planLoading}
           />
         )}
-        <main className={['/login', '/signup'].includes(location.pathname) ? 'flex-1' : 'flex-1 p-4 sm:p-6 lg:px-8'}>
+        <main className={shouldHideSidebar ? 'flex-1' : 'flex-1 p-4 sm:p-6 lg:px-8'}>
           <Outlet />
         </main>
       </div>

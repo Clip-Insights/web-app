@@ -1,4 +1,4 @@
-import CryptoJS, { x64 } from "crypto-js";
+import CryptoJS from "crypto-js";
 
 // Function to fetch data from an API endpoint
 export const getData = async (url) => {
@@ -36,13 +36,13 @@ export function truncateFileName(fileName, maxLength = 30) {
     return `${fileName.substring(0, maxLength)}...`;
   }
   return fileName;
-} 
+}
 
 
 export const getApiUrl = (endpoint) => {
     // Dynamically set the API URL based on the environment
     const url =
-        process.env.NODE_ENV === 'production'
+        import.meta.env.PROD
             ? `${import.meta.env.VITE_API_URL}/api/${endpoint}`
             : `http://localhost:8000/api/${endpoint}`;
 
@@ -75,10 +75,10 @@ export const decryptToken = (encryptedToken) => {
 
 // async function getKey() {
 //   const keyMaterial = await window.crypto.subtle.importKey(
-//       'raw', 
-//       new TextEncoder().encode(ENCRYPTION_KEY), 
-//       { name: 'PBKDF2' }, 
-//       false, 
+//       'raw',
+//       new TextEncoder().encode(ENCRYPTION_KEY),
+//       { name: 'PBKDF2' },
+//       false,
 //       ['deriveKey']
 //   );
 
@@ -128,3 +128,28 @@ export const decryptToken = (encryptedToken) => {
 
 //   return new TextDecoder().decode(decrypted);
 // }
+
+
+export async function accountRequest(endpoint, body, signal) {
+  let response;
+  try {
+    response = await fetch(getApiUrl(`account/${endpoint}`), {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal,
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    throw new Error('We couldn’t connect. Check your connection and try again.');
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const values = Object.values(data?.errors || {}).flat();
+    const message = [data?.message, data?.detail, data?.error, ...values].find(value => typeof value === 'string');
+    const error = new Error(message || 'We couldn’t complete that request. Please try again.');
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}

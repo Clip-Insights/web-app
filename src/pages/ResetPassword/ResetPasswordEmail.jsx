@@ -1,88 +1,28 @@
-import React, { useState } from 'react';
-import { ToastContainer } from "react-toastify";
-import { handleError, handleSuccess } from "../../services/Utils";
-import login_png from "/images/login.png";
-import { getApiUrl } from "../../services/apiService";
+import { useState } from 'react';
+import AuthLayout from '../../components/Auth/AuthLayout';
+import AuthField from '../../components/Auth/AuthField';
+import { AuthSubmit, BackToSignIn } from '../../components/Auth/AuthActions';
+import Notice from '../../components/Feedback/Notice';
+import { requestPasswordReset } from '../../services/accountService';
 
-const ResetPasswordEmail = () => {
+export default function ResetPasswordEmail() {
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const url = getApiUrl("account/reset-password/");
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-
-      const data = await response.json();
-
-      if (response.ok) {
-        handleSuccess('Check your email for the reset link.');
-      } else {
-        handleError('This email is not registered.');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      handleError('An error occurred. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
+  const [status, setStatus] = useState('idle');
+  const [error, setError] = useState('');
+  const submit = async event => {
+    event.preventDefault();
+    if (status === 'sending') return;
+    setStatus('sending'); setError('');
+    try { await requestPasswordReset(email.trim()); setStatus('sent'); }
+    catch (failure) { setError(failure.status === 400 || failure.status === 404 ? 'We couldn’t send a reset link. Check your email address and try again.' : failure.message); setStatus('idle'); }
   };
-
-  return (
-    <div className="flex flex-col w-full md:flex-row justify-around items-center min-h-92vh p-8">
-      <div className="w-full max-w-md mr-8 mb-8 md:mb-0">
-        <h2 className="text-3xl font-bold mb-6 text-gray-800">Reset Password</h2>
-        <form onSubmit={handleSubmit}>
-          {/* Email Input */}
-          <div className="mb-6">
-            <label htmlFor="email" className="block text-gray-700 mb-2">Email</label>
-            <input
-              type="email"
-              id="email"
-              placeholder="email@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#f4cbb3] focus:border-transparent"
-              required
-            />
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-customPrimary  hover:bg-customPrimary text-white py-3 rounded-md text-lg focus:outline-none transition duration-300"
-          >
-            {loading ? 'Sending...' : 'Send Email'}
-          </button>
-
-          {/* Conditional Message Display */}
-          {/* {error && <p className="text-red-500 mt-4">{error}</p>}
-          {success && <p className="text-green-500 mt-4">Check your email for the reset link.</p>} */}
-        </form>
-        <ToastContainer />
-      </div>
-
-      {/* Image Section */}
-      <div className="w-full max-w-md h-96 flex justify-center items-center">
-        <img
-          src={login_png}
-          alt="Reset Password Illustration"
-          className="rounded-lg max-w-full h-full object-cover"
-        />
-      </div>
-    </div>
-  );
-};
-
-export default ResetPasswordEmail;
+  return <AuthLayout>
+    <h1 className="text-3xl font-bold tracking-tight">{status === 'sent' ? 'Check your inbox.' : 'Forgot your password?'}</h1>
+    <p className="mb-8 mt-3 text-sm leading-6 text-auth-muted">{status === 'sent' ? `We sent a reset link to ${email.trim()}. Open the email to choose a new password.` : 'Enter your account email and we’ll send you a link to reset it.'}</p>
+    {status === 'sent' ? <Notice action={<button type="button" onClick={() => setStatus('idle')} className="min-h-11 rounded font-medium text-auth-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Try another email</button>}>Can’t find it? Check your spam folder. You can also return here to request another link.</Notice> : <form onSubmit={submit} aria-label="Reset password" className="space-y-5">
+      {error && <Notice tone="error">{error}</Notice>}
+      <fieldset disabled={status === 'sending'} className="space-y-5"><AuthField label="Email address" id="reset-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={event => setEmail(event.target.value)} /><AuthSubmit busy={status === 'sending'}>{status === 'sending' ? 'Sending link…' : 'Send reset link'}</AuthSubmit></fieldset>
+    </form>}
+    <BackToSignIn />
+  </AuthLayout>;
+}

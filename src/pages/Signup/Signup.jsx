@@ -1,6 +1,5 @@
 import { readPlanSelection, withPlanSelection, planDestination, clearPendingPlanSelection, rememberPlanSelection } from "../../utils/planSelection";
 import { useState } from "react";
-import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../../services/Utils";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../../components/Auth/AuthLayout";
@@ -135,7 +134,7 @@ const Signup = () => {
         <GoogleLogin size="large" shape="rectangular" text="signup_with" width="256" onSuccess={handleGoogleSignup} onError={() => handleError("Google signup failed")} />
       </div>
       <p className="mt-6 text-center text-sm text-auth-muted">Already have an account? <Link to={withPlanSelection("/login", selection)} className="rounded font-semibold text-auth-accent underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Sign in</Link></p>
-      <ToastContainer />
+
     </AuthLayout>
   );
 };

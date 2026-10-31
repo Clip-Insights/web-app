@@ -33,20 +33,18 @@ export const loadPaddle = (environment, clientToken) => {
     document.head.appendChild(script);
   });
 
+  paddlePromise = paddlePromise.catch(error => { paddlePromise = null; throw error; });
   return paddlePromise;
 };
 
-export const openCheckout = async (config, { onSuccess } = {}) => {
+export const openCheckout = async (config, { onSuccess, onError } = {}) => {
   const paddle = await loadPaddle(config.environment, config.client_token);
-  let unsubscribe = null;
-  if (onSuccess) {
-    unsubscribe = onPaddleEvent((event) => {
-      if (event?.name === "checkout.completed") {
-        unsubscribe();
-        onSuccess(event);
-      }
-    });
-  }
+  const unsubscribe = onPaddleEvent(event => {
+    if (event?.name === 'checkout.completed') { unsubscribe(); onSuccess?.(event); }
+    else if (event?.name === 'checkout.closed') unsubscribe();
+    else if (event?.name === 'checkout.error') { unsubscribe(); onError?.(); }
+  });
+  try {
   paddle.Checkout.open({
     items: [{ priceId: config.price_id, quantity: 1 }],
     customer: { email: config.email },
@@ -57,4 +55,5 @@ export const openCheckout = async (config, { onSuccess } = {}) => {
       showAddDiscounts: false,
     },
   });
+  } catch (error) { unsubscribe(); throw error; }
 };

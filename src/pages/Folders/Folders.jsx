@@ -22,21 +22,22 @@ const Folders = () => {
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchFolders = async () => {
       try {
-        setLoading(true);
+        setLoading(true); setLoadError(false);
         const response = await authRequest({
           method: "get",
           url: getApiUrl("userspace/folders/"),
         });
         console.log(response);
-        
+
         setFolders(response.data);
       } catch (error) {
-        showAlert("Failed to fetch folders", "error");
+
         setLoadError(true);
         console.error("Error fetching folders:", error);
       } finally {
@@ -45,15 +46,9 @@ const Folders = () => {
     };
 
     fetchFolders();
-  }, [authRequest]);
+  }, [authRequest, attempt]);
 
-  const showAlert = (message, type = "success") => {
-    setAlert({ message, type });
-    // Auto-dismiss alert after 5 seconds
-    setTimeout(() => {
-      setAlert(null);
-    }, 5000);
-  };
+  const showAlert = (message, type = 'success') => setAlert({ message, type });
 
   const handleRename = async (oldName, newName) => {
     try {
@@ -105,7 +100,7 @@ const Folders = () => {
         },
       });
       console.log(response);
-      
+
       if (response.data) {
         setFolders((prevFolders) =>
           prevFolders.filter((folder) => folder.id !== folderToDelete.id)
@@ -137,7 +132,7 @@ const Folders = () => {
         },
       });
       console.log(response);
-      
+
       if (response.data) {
         setFolders((prev) => [...prev, response.data]);
         setNewFolderName("");
@@ -194,7 +189,7 @@ const Folders = () => {
       <LibraryToolbar loading={loading} title="Folders" description="A little structure for everything you’re learning." count={sortedFolders.length} query={searchQuery} onQueryChange={setSearchQuery} sort={sortType} onSortChange={setSortType} sortOptions={sortOptions} action={<button onClick={() => setShowCreateFolderModal(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"><FolderPlus size={17} aria-hidden="true" />New folder</button>} />
 
       {/* Folders Grid with loading state handling similar to RecentFiles */}
-      {loadError ? <LibraryLoadError /> : loading ? (
+      {loadError ? <LibraryLoadError onRetry={() => setAttempt(value => value + 1)} /> : loading ? (
         <FolderGridSkeleton />
       ) : (
         <>
@@ -230,6 +225,7 @@ const Folders = () => {
       {/* Create Folder Modal - responsive padding and width */}
       {showCreateFolderModal && (
         <LibraryDialog busy={creating} title="New folder" onClose={() => setShowCreateFolderModal(false)}>
+          <form onSubmit={event => { event.preventDefault(); if (!creating) handleCreateFolder(); }}>
             <div className="mb-4">
               <label htmlFor="folderName" className="mb-2 block text-sm font-medium">Folder name</label>
               <input
@@ -239,12 +235,12 @@ const Folders = () => {
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 autoFocus
-                placeholder="Enter Folder Name"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-customPrimary"
+                placeholder="For example, Machine learning"
+                className="min-h-12 w-full rounded-lg border border-auth-field px-4 text-sm focus:border-auth-accent focus:outline-none focus:ring-2 focus:ring-auth-accent/20"
               />
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
                 disabled={creating}
@@ -252,19 +248,19 @@ const Folders = () => {
                   setShowCreateFolderModal(false);
                   setNewFolderName("");
                 }}
-                className="px-4 py-2 text-base font-medium text-customPrimary border-customPrimary border rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-customPrimary order-2 sm:order-1"
+                className="min-h-11 rounded-lg border border-auth-line px-4 text-sm font-medium text-auth-ink hover:bg-auth-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent"
               >
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={handleCreateFolder}
-                className="px-4 py-2 text-base font-medium text-white bg-customPrimary rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-customPrimary order-1 sm:order-2"
+                type="submit"
+                className="min-h-11 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent disabled:opacity-50"
                 disabled={creating || !newFolderName.trim()}
               >
                 {creating ? 'Creating…' : 'Create'}
               </button>
             </div>
+          </form>
         </LibraryDialog>
       )}
 

@@ -1,7 +1,10 @@
+import Notice from '../../components/Feedback/Notice';
+import { fetchMyPlan } from '../../services/planService';
+import { validateUpload } from '../../services/fileService';
 import { FileListSkeleton } from '../../components/Loading/Skeletons';
 import useBulkFileActions from '../../hooks/useBulkFileActions';
 import LibraryLoadError from "../../components/Cards/LibraryLoadError";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Upload } from "lucide-react";
 import FileList from "../../components/Cards/FileList";
 import Alert from "../../components/Cards/Alert";
@@ -16,8 +19,7 @@ const Files = () => {
   if (!folder_id) {
     folder_id = -1;
   }
-  console.log(folder_id);
-  
+
   const { authRequest } = useAuth();
   const [files, setFiles] = useState([]);
   const bulkAction = useBulkFileActions(setFiles, folder_id);
@@ -31,24 +33,25 @@ const Files = () => {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadLimits, setUploadLimits] = useState(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
-    // Fetch folder name and files from the API
-    setLoading(true);
-    fetchFolderAndFiles(folder_id).then((data) => {
-      if (data) {
-        setFiles(data.files || []);
-        setTitle(data?.folder_name || "All files");
-      }
-      setLoading(false);
-    });
-    
-    // Fetch all folders for the move operation
-    fetchFolders();
-  }, [folder_id]);
+    let active = true;
+    setLoading(true); setLoadError(false);
+    const url = folder_id === -1 ? 'userspace/files/' : `userspace/folder-files/?folder_id=${folder_id}`;
+    authRequest({ method: 'get', url: getApiUrl(url) }).then(response => {
+      if (!active) return;
+      setFiles(response.data.files || []);
+      setTitle(response.data.folder_name || 'All files');
+    }).catch(error => { if (active) setLoadError(error.response?.status || true); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [folder_id, authRequest, attempt]);
 
-  const fetchFolders = async () => {
+  const fetchFolders = useCallback(async () => {
     setFoldersLoading(true);
     setFoldersError(false);
     try {
@@ -56,49 +59,20 @@ const Files = () => {
         method: "get",
         url: getApiUrl("userspace/folders/"),
       });
-      
-      console.log("Folders fetched:", response.data);
+
       setFolders(response.data);
     } catch (error) {
       setFoldersError(true);
       console.error("Error fetching folders:", error);
-      showAlert("Failed to fetch folders", "error");
+
     } finally {
       setFoldersLoading(false);
     }
-  };
+  }, [authRequest]);
 
-  const fetchFolderAndFiles = async (folder_id) => {
-    console.log("calling fetch files function with folder id: ", folder_id);
-    
-    try {
-      const api_url =
-        folder_id === -1
-          ? "userspace/files/"
-          : `userspace/folder-files/?folder_id=${folder_id}`;
-      const response = await authRequest({
-        method: "get",
-        url: getApiUrl(api_url),
-      });
+  useEffect(() => { fetchFolders(); }, [fetchFolders]);
 
-      console.log(response.data);
-      return response.data;
-    } catch (error) {
-      setLoadError(true);
-      console.error("Error fetching folder and files:", error);
-      showAlert("Failed to fetch folder and files", "error");
-      return null;
-    }
-  };
-
-  const showAlert = (message, type = "success") => {
-    setAlert({ message, type });
-    
-    // Auto-dismiss alert after 5 seconds
-    setTimeout(() => {
-      setAlert(null);
-    }, 5000);
-  };
+  const showAlert = (message, type = 'success') => setAlert({ message, type });
 
   const handleRename = async (oldName, newName) => {
     const fileIndex = files.findIndex((file) => file.name === oldName);
@@ -138,8 +112,7 @@ const Files = () => {
         url: getApiUrl("userspace/files/"),
         data: { file_id: file.id }
       })
-      .then((response) => {
-        console.log(response.data);
+      .then(() => {
         // Update the UI
         setFiles((prevFiles) =>
           prevFiles.filter((file) => file.name !== fileName)
@@ -163,13 +136,13 @@ const Files = () => {
           folder_id: newFolderId
         }
       });
-      
+
       console.log("Move response:", response.data);
-      
+
       // If we're currently viewing all files, just update the folder_id
       if (folder_id === -1) {
-        setFiles(prevFiles => 
-          prevFiles.map(file => 
+        setFiles(prevFiles =>
+          prevFiles.map(file =>
             file.id === fileId ? { ...file, folder_id: newFolderId } : file
           )
         );
@@ -177,7 +150,7 @@ const Files = () => {
         // If we're viewing a specific folder, remove the file from the current view
         setFiles(prevFiles => prevFiles.filter(file => file.id !== fileId));
       }
-      
+
       // Show success message
       showAlert(response.data.message || "File moved successfully", "success");
     } catch (error) {
@@ -188,16 +161,16 @@ const Files = () => {
   };
 
   const handleUpload = () => {
-    // Remind users that only PDF files are allowed
-    showAlert("Please select PDF files only", "info");
+    setUploadError('');
     fileInputRef.current.click();
   };
 
   const handleFileChange = async (e) => {
     const uploadedFile = e.target.files[0]; // Get the first file only
 
-    if (uploadedFile) {
+    if (uploadedFile && !uploading) {
       setUploading(true);
+      setUploadError('');
       const formData = new FormData();
       formData.append("file", uploadedFile); // Append a single file
 
@@ -205,16 +178,19 @@ const Files = () => {
         formData.append("folder_id", folder_id);
       }
       try {
+        const { plan } = await fetchMyPlan(authRequest);
+        setUploadLimits(plan);
+        const validation = validateUpload(uploadedFile, plan);
+        if (validation) { setUploadError(validation); return; }
         const response = await authRequest({
           method: "post",
           url: getApiUrl("userspace/files/"),
           data: formData,
-          headers: { 
-            "Content-Type": "multipart/form-data" 
+          headers: {
+            "Content-Type": "multipart/form-data"
           }
         });
 
-        console.log(response.data);
         // Update the UI with the new file
         const newFile = {
           id: response.data.file.id,
@@ -224,7 +200,6 @@ const Files = () => {
           folder_id: response.data.file.folder_id,
           size: response.data.file.size,
         };
-        console.log(newFile);
 
         setFiles((prev) => [...prev, newFile]);
         showAlert("File uploaded successfully", "success");
@@ -232,9 +207,10 @@ const Files = () => {
         console.error("Error uploading file:", error);
         // Plan-limit rejections (429) carry a user-facing message from the backend.
         const detail = error.response?.data;
-        showAlert(detail?.message || detail?.error || "Failed to upload file", "error");
+        setUploadError(detail?.message || detail?.error || 'Your file couldn’t be uploaded. Check your connection and try again.');
       } finally {
         setUploading(false);
+        e.target.value = '';
       }
     }
 
@@ -286,8 +262,10 @@ const Files = () => {
       </LibraryToolbar>
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,application/pdf" className="hidden" />
 
+      <p className="mb-4 text-xs text-auth-muted">PDF files{uploadLimits ? ` · Up to ${uploadLimits.max_file_size_mb} MB per file on your plan` : ' · Size and storage limits depend on your plan'}.</p>
+      {uploadError && <div className="mb-5"><Notice tone="error" action={<button type="button" onClick={handleUpload} className="min-h-11 rounded font-medium text-auth-accent">Choose a file</button>}>{uploadError}</Notice></div>}
       {/* Library content */}
-      {loadError ? <LibraryLoadError /> : loading ? (
+      {loadError ? <LibraryLoadError onRetry={() => setAttempt(value => value + 1)} unavailable={folder_id !== -1 && [400, 403, 404].includes(loadError)} /> : loading ? (
         <FileListSkeleton />
       ) : (
         <>

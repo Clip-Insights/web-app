@@ -1,7 +1,7 @@
 import { FileListSkeleton } from '../../components/Loading/Skeletons';
 import useBulkFileActions from '../../hooks/useBulkFileActions';
 import LibraryLoadError from "../../components/Cards/LibraryLoadError";
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ArrowRight } from 'lucide-react'
 import FileList from '../../components/Cards/FileList'
 import Alert from '../../components/Cards/Alert'
@@ -21,34 +21,27 @@ const RecentFiles = () => {
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState(false);
 
-    useEffect(() => {
-        // Fetch recent files from the API
-        fetchRecentFiles()
-        
-        // Fetch all folders for the move operation
-        fetchFolders()
-    }, [])
-
-    const fetchRecentFiles = async () => {
+    const fetchRecentFiles = useCallback(async () => {
         setLoading(true)
+        setLoadError(false);
         try {
             const response = await authRequest({
                 method: "get",
                 url: getApiUrl("userspace/files/?number_of_files=4"),
             })
-            
+
             console.log("Recent files fetched:", response.data)
             setFiles(response.data.files || [])
             setLoading(false)
         } catch (error) {
             setLoadError(true);
             console.error("Error fetching recent files:", error)
-            showAlert("Failed to fetch recent files", "error")
+
             setLoading(false)
         }
-    }
+    }, [authRequest]);
 
-    const fetchFolders = async () => {
+    const fetchFolders = useCallback(async () => {
         setFoldersLoading(true);
         setFoldersError(false);
         try {
@@ -56,26 +49,21 @@ const RecentFiles = () => {
                 method: "get",
                 url: getApiUrl("userspace/folders/"),
             })
-            
+
             console.log("Folders fetched:", response.data)
             setFolders(response.data)
         } catch (error) {
             setFoldersError(true);
             console.error("Error fetching folders:", error)
-            showAlert("Failed to fetch folders", "error")
+
         } finally {
             setFoldersLoading(false);
         }
-    }
+    }, [authRequest]);
 
-    const showAlert = (message, type = "success") => {
-        setAlert({ message, type })
-        
-        // Auto-dismiss alert after 5 seconds
-        setTimeout(() => {
-            setAlert(null)
-        }, 5000)
-    }
+    useEffect(() => { fetchRecentFiles(); fetchFolders(); }, [fetchRecentFiles, fetchFolders]);
+
+    const showAlert = (message, type = 'success') => setAlert({ message, type });
 
     const handleRename = async (oldName, newName) => {
         const fileIndex = files.findIndex((file) => file.name === oldName)
@@ -91,7 +79,7 @@ const RecentFiles = () => {
                     new_name: newName
                 }
             })
-            
+
             console.log(response.data)
             // Update the file name in the UI
             setFiles((prevFiles) => {
@@ -119,7 +107,7 @@ const RecentFiles = () => {
                 url: getApiUrl("userspace/files/"),
                 data: { file_id: file.id }
             })
-            
+
             console.log(response.data)
             // Update the UI
             setFiles((prevFiles) =>
@@ -142,16 +130,16 @@ const RecentFiles = () => {
                     folder_id: newFolderId
                 }
             })
-            
+
             console.log("Move response:", response.data)
-            
+
             // Update the file's folder_id or remove it from the list
-            setFiles(prevFiles => 
-                prevFiles.map(file => 
+            setFiles(prevFiles =>
+                prevFiles.map(file =>
                     file.id === fileId ? { ...file, folder_id: newFolderId } : file
                 )
             )
-            
+
             // Show success message
             showAlert(response.data.message || "File moved successfully", "success")
         } catch (error) {
@@ -171,7 +159,7 @@ const RecentFiles = () => {
         <div className="w-full mt-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
                 <h2 className="text-lg font-semibold text-gray-900">Recently saved</h2>
-                <button 
+                <button
                     onClick={viewFilesPage}
                     className="min-h-11 px-3 py-2 text-auth-accent rounded-lg flex items-center justify-center gap-2 hover:bg-white transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent"
                 >
@@ -180,7 +168,7 @@ const RecentFiles = () => {
                 </button>
             </div>
 
-            {loadError ? <LibraryLoadError /> : loading ? (
+            {loadError ? <LibraryLoadError onRetry={fetchRecentFiles} /> : loading ? (
                 <FileListSkeleton compact />
             ) : files.length > 0 ? (
                 <FileList onBulkAction={bulkAction} files={files} compact label="Recently saved" onRename={handleRename} onDelete={handleDelete} onMove={handleMove} folders={folders} foldersLoading={foldersLoading} foldersError={foldersError} onRetryFolders={fetchFolders} />

@@ -3,7 +3,9 @@ import PropTypes from 'prop-types';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { readPlanSelection, withPlanSelection } from '../../utils/planSelection';
-import { toast, ToastContainer } from 'react-toastify';
+import { toast } from 'react-toastify';
+import Notice from '../../components/Feedback/Notice';
+import usePlanActivation from '../../hooks/usePlanActivation';
 import { Check, NotebookPen, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMyPlan, fetchPlans, formatStorage } from '../../services/planService';
@@ -186,6 +188,7 @@ const Pricing = () => {
   const [subscription, setSubscription] = useState(null);
   const [busyPlan, setBusyPlan] = useState(null);
   const [error, setError] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [accountLoading, setAccountLoading] = useState(isAuthenticated);
   const [accountError, setAccountError] = useState(false);
@@ -222,29 +225,25 @@ const Pricing = () => {
     return () => { cancelled = true; };
   }, [isAuthenticated, refreshMine, attempt]);
 
+  const activation = usePlanActivation(authRequest, isAuthenticated, refreshMine);
   const handleUpgrade = async (plan) => {
-    if (busyPlan || cancelBusy) return;
+    if (busyPlan || cancelBusy || activation.pending) return;
     if (!isAuthenticated) {
       navigate(withPlanSelection('/login', { plan: plan.slug, billing: cycle }));
       return;
     }
     setBusyPlan(plan.slug);
+    setCheckoutError('');
     try {
       const config = await createCheckout(authRequest, plan.slug, cycle);
       await openCheckout(config, {
         onSuccess: () => {
-          toast.success('Payment successful! Activating your plan…');
-          // The webhook activates the plan; poll briefly until it lands.
-          let attempts = 0;
-          const poll = setInterval(async () => {
-            attempts += 1;
-            await refreshMine();
-            if (attempts >= 5) clearInterval(poll);
-          }, 2000);
+          activation.begin(plan.slug);
         },
+        onError: () => setCheckoutError('Checkout couldn’t complete. Check your payment status before trying again, or contact support if you were charged.'),
       });
     } catch (e) {
-      toast.error(e.response?.data?.error || e.response?.data?.detail || e.message || 'Could not start checkout');
+      setCheckoutError(e.response?.data?.error || e.response?.data?.detail || e.message || 'Could not start checkout. Please try again.');
     } finally {
       setBusyPlan(null);
     }
@@ -269,7 +268,7 @@ const Pricing = () => {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <ToastContainer />
+
       <div className="mb-6 flex min-h-16 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0"><h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-auth-ink">{selectedPlan ? `Your ${selectedPlan.name} plan` : 'A plan for the way you learn.'}</h1>
         <p className="mt-2 text-sm text-auth-muted">
@@ -304,7 +303,7 @@ const Pricing = () => {
         <div className="text-center py-16">
           <p className="text-auth-muted">Plans couldn&apos;t be loaded. Check your connection and try again.</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => setAttempt(value => value + 1)}
             className="mt-4 px-4 py-2 rounded-lg bg-auth-accent hover:bg-customPrimaryHover text-white text-sm font-medium"
           >
             Retry
@@ -312,6 +311,8 @@ const Pricing = () => {
         </div>
       )}
 
+      {checkoutError && <div className="mb-6"><Notice tone="error">{checkoutError}</Notice></div>}
+      {activation.status !== 'idle' && <div className="mb-6"><Notice tone={activation.status === 'confirmed' ? 'success' : activation.status === 'error' ? 'error' : 'info'} action={['delayed', 'error'].includes(activation.status) && <div className="flex flex-wrap gap-4"><button type="button" onClick={activation.retry} className="min-h-11 rounded font-medium text-auth-accent">Check plan status</button><a href="https://clipinsights.org/contact" className="inline-flex min-h-11 items-center rounded text-auth-muted underline underline-offset-4">Contact support</a></div>}>{activation.status === 'checking' ? 'Payment received. We’re waiting for your plan to activate. You don’t need to pay again.' : activation.status === 'confirmed' ? 'Your plan is active. Your updated allowances are ready to use.' : activation.status === 'error' ? 'We couldn’t check your plan status. Check your connection and try again before making another payment.' : 'Your payment is taking a little longer to confirm. Check your plan status again in a moment, or contact support. Please don’t pay again.'}</Notice></div>}
       {!plans && !error && <PricingSkeleton />}
       {(billingError || accountError) && !error && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-auth-line bg-white p-4 text-sm text-auth-muted"><p>Some billing details couldn’t be loaded. Please retry before choosing a plan.</p><button type="button" onClick={() => setAttempt(value => value + 1)} className="min-h-11 rounded-lg border border-auth-line px-4 hover:bg-auth-panel">Retry billing</button></div>}
 
@@ -333,7 +334,7 @@ const Pricing = () => {
                 detailsLoading={catalogLoading || accountLoading}
                 accountError={accountError || billingError}
                 cancelBusy={cancelBusy}
-                checkoutPending={Boolean(busyPlan)}
+                checkoutPending={Boolean(busyPlan) || activation.pending}
                 onUpgrade={handleUpgrade}
                 onCancel={handleCancel}
               />

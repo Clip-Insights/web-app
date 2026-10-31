@@ -19,7 +19,7 @@ vi.mock('@react-oauth/google',()=>{
 });
 
 function Destination(){const location=useLocation();return <h1>{location.pathname+location.search}</h1>;}
-function routes(entry){return <MemoryRouter initialEntries={[entry]}><Routes><Route path="/login" element={<Login/>}/><Route path="/signup" element={<Signup/>}/><Route path="/signup-success" element={<SignupSuccess/>}/><Route path="/verify-email/:uid/:token" element={<VerifyEmail/>}/><Route path="/pricing" element={<Destination/>}/><Route path="/" element={<Destination/>}/></Routes></MemoryRouter>;}
+function routes(entry){return <MemoryRouter initialEntries={[entry]}><Routes><Route path="/login" element={<Login/>}/><Route path="/signup" element={<Signup/>}/><Route path="/signup-success" element={<SignupSuccess/>}/><Route path="/verify-email/:uid/:token" element={<VerifyEmail/>}/><Route path="/pricing" element={<Destination/>}/><Route path="/" element={<Destination/>}/><Route path="/files/:id" element={<Destination/>}/></Routes></MemoryRouter>;}
 beforeEach(()=>{vi.resetAllMocks();localStorage.clear();auth.isAuthenticated=false;vi.stubGlobal('fetch',vi.fn().mockResolvedValue(new Response(JSON.stringify({token:{access:'test-access',refresh:'test-refresh'}}),{headers:{'content-type':'application/json'}})));});
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 
@@ -50,8 +50,8 @@ describe('authentication with a selected plan',()=>{
   fireEvent.change(screen.getByLabelText('Password'),{target:{value:'examplepass1'}});
   fireEvent.change(screen.getByLabelText('Confirm password'),{target:{value:'examplepass1'}});
   fireEvent.click(screen.getByRole('button',{name:'Create account',exact:true}));
-  expect(await screen.findByRole('heading',{name:'Signup Successful!'})).toBeTruthy();
-  expect(screen.getByRole('link',{name:'Login'}).getAttribute('href')).toBe('/login?plan=pro&billing=annual');
+  expect(await screen.findByRole('heading',{name:'Check your inbox.'})).toBeTruthy();
+  expect(screen.getByRole('link',{name:'Back to sign in'}).getAttribute('href')).toBe('/login?plan=pro&billing=annual');
   expect(pendingPlanSelection()).toEqual({plan:'pro',billing:'annual'});
  });
  it('sends an existing signed-in user directly to their plan review',async()=>{
@@ -73,4 +73,11 @@ describe('authentication with a selected plan',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Continue with Google'}));
   expect(await screen.findByRole('heading',{name:'/'})).toBeTruthy();
  });
+ it('returns an expired session to its previous local page after sign-in',async()=>{
+  render(routes({pathname:'/login',state:{from:'/files/course?sort=name',reason:'expired'}}));
+  expect(screen.getByText(/Your session has expired/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Continue with Google'}));
+  expect(await screen.findByRole('heading',{name:'/files/course?sort=name'})).toBeTruthy();
+ });
+
 });

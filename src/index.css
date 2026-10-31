@@ -1,3 +1,5 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+.Toastify__toast { @apply rounded-xl border border-auth-line bg-white font-primary text-sm text-auth-ink shadow-sm; }
+.Toastify__close-button { @apply min-h-11 min-w-11 text-auth-muted; }

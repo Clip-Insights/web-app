@@ -14,3 +14,13 @@ describe('bulk file requests', () => {
     expect(request.mock.calls[0][0]).toMatchObject({ method: 'patch', data: { file_id: 4, folder_id: 9 } });
   });
 });
+
+
+it('validates file type and the exact per-file allowance returned by the server', async () => {
+  const { validateUpload } = await import('./fileService');
+  const plan = { max_file_size_mb: 5 };
+  expect(validateUpload({ type: 'text/plain', size: 10 }, plan)).toMatch(/PDF/);
+  expect(validateUpload({ type: 'application/pdf', size: 5 * 1024 * 1024 }, plan)).toBeNull();
+  expect(validateUpload({ type: 'application/pdf', size: 5 * 1024 * 1024 + 1 }, plan)).toMatch(/5 MB/);
+  expect(validateUpload({ type: 'application/pdf', size: 1 }, null)).toMatch(/allowance/);
+});

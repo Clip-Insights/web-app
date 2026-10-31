@@ -1,11 +1,13 @@
+import { ToastContainer } from 'react-toastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import Pricing from './Pricing';
 import { fetchPlans, fetchMyPlan } from '../../services/planService';
 import { createCheckout, fetchBillingCatalog, fetchSubscription } from '../../services/billingService';
 import { openCheckout } from '../../services/paddle';
 vi.mock('../../context/AuthContext', () => ({useAuth: () => auth}));
+const render = ui => rtlRender(<>{ui}<ToastContainer /></>);
 const auth = {isAuthenticated:false,authRequest:vi.fn()};
 vi.mock('../../services/planService', () => ({fetchPlans:vi.fn(),fetchMyPlan:vi.fn(),formatStorage:value=>`${value} MB`}));
 vi.mock('../../services/billingService', () => ({fetchBillingCatalog:vi.fn(),fetchSubscription:vi.fn(),createCheckout:vi.fn(),cancelSubscription:vi.fn()}));
