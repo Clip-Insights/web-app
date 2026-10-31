@@ -11,6 +11,7 @@ function MainLayout() {
   const { isAuthenticated, authRequest } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [packagePlan, setPackagePlan] = useState(null);
+  const [planLoading, setPlanLoading] = useState(isAuthenticated);
 
   const hideSidebarRoutes = ['/login', '/signup', '/reset-password'];
   const shouldHideSidebar = hideSidebarRoutes.includes(location.pathname);
@@ -19,14 +20,17 @@ function MainLayout() {
   useEffect(() => {
     if (!isAuthenticated) {
       setPackagePlan(null);
+      setPlanLoading(false);
       return;
     }
     let cancelled = false;
+    setPlanLoading(true);
     fetchMyPlan(authRequest)
       .then((data) => {
         if (!cancelled && data?.plan) setPackagePlan({ name: data.plan.name });
       })
-      .catch((error) => console.error('Error fetching plan for header:', error));
+      .catch((error) => console.error('Error fetching plan for header:', error))
+      .finally(() => { if (!cancelled) setPlanLoading(false); });
     return () => {
       cancelled = true;
     };
@@ -62,6 +66,7 @@ function MainLayout() {
             onToggleSidebar={handleSidebarToggle}
             isSidebarOpen={isSidebarOpen}
             packagePlan={packagePlan}
+            planLoading={planLoading}
           />
         )}
         <main className={['/login', '/signup'].includes(location.pathname) ? 'flex-1' : 'flex-1 p-4 sm:p-6 lg:px-8'}>

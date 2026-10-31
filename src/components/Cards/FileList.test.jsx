@@ -36,6 +36,17 @@ describe('bulk file controls', () => {
     expect(screen.queryByText('Learning')).toBeNull();
     expect(screen.getByText('Research')).toBeTruthy();
   });
+  it('distinguishes loading folder names and destinations from an empty list', () => {
+    const { rerender } = render(<FileList {...props} files={[{...files[0],folder_id:7}]} folders={[]} foldersLoading />);
+    expect(screen.getByRole('status',{name:'Loading folder name'})).toBeTruthy();
+    fireEvent.click(screen.getByRole('button',{name:'Actions for Lesson 1.pdf'}));
+    fireEvent.click(screen.getByRole('button',{name:'Move to folder'}));
+    expect(screen.getByRole('status',{name:'Loading folder destinations'})).toBeTruthy();
+    expect(screen.queryByText(/No folders yet/)).toBeNull();
+    rerender(<FileList {...props} files={[{...files[0],folder_id:7}]} foldersLoading={false} />);
+    expect(screen.queryByRole('status',{name:'Loading folder name'})).toBeNull();
+    expect(screen.getByRole('button',{name:'Learning'})).toBeTruthy();
+  });
   it('requires confirmation and retains only failed files for retry', async () => {
     const onBulkAction = vi.fn().mockResolvedValue({ successfulIds: [1, 3], failedIds: [2] });
     render(<FileList {...props} onBulkAction={onBulkAction} />);

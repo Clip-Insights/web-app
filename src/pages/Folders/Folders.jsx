@@ -1,3 +1,4 @@
+import { FolderGridSkeleton } from '../../components/Loading/Skeletons';
 import LibraryLoadError from "../../components/Cards/LibraryLoadError";
 import { useState, useEffect } from "react";
 import { FolderPlus } from "lucide-react";
@@ -18,6 +19,7 @@ const Folders = () => {
   const [sortType, setSortType] = useState("Latest");
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
+  const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const navigate = useNavigate();
@@ -83,6 +85,7 @@ const Folders = () => {
     } catch (error) {
       showAlert("Failed to rename folder", "error");
       console.error("Error renaming folder:", error);
+      throw error;
     }
   };
 
@@ -118,11 +121,13 @@ const Folders = () => {
   };
 
   const handleCreateFolder = async () => {
+    if (creating) return;
     if (!newFolderName.trim()) {
       showAlert("Folder name cannot be empty", "error");
       return;
     }
 
+    setCreating(true);
     try {
       const response = await authRequest({
         method: "post",
@@ -144,7 +149,7 @@ const Folders = () => {
     } catch (error) {
       showAlert("Failed to create folder", "error");
       console.error("Error creating folder:", error);
-    }
+    } finally { setCreating(false); }
   };
 
   const filteredFolders = folders.filter((folder) => {
@@ -186,16 +191,11 @@ const Folders = () => {
 
   return (
     <div className="mx-auto w-full max-w-7xl">
-      <LibraryToolbar title="Folders" description="A little structure for everything you’re learning." count={sortedFolders.length} query={searchQuery} onQueryChange={setSearchQuery} sort={sortType} onSortChange={setSortType} sortOptions={sortOptions} action={<button onClick={() => setShowCreateFolderModal(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"><FolderPlus size={17} aria-hidden="true" />New folder</button>} />
+      <LibraryToolbar loading={loading} title="Folders" description="A little structure for everything you’re learning." count={sortedFolders.length} query={searchQuery} onQueryChange={setSearchQuery} sort={sortType} onSortChange={setSortType} sortOptions={sortOptions} action={<button onClick={() => setShowCreateFolderModal(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"><FolderPlus size={17} aria-hidden="true" />New folder</button>} />
 
       {/* Folders Grid with loading state handling similar to RecentFiles */}
       {loadError ? <LibraryLoadError /> : loading ? (
-        <div className="col-span-full flex items-center justify-center py-8">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="h-8 w-8 bg-gray-200 rounded-full mb-2"></div>
-            <div className="h-4 w-32 bg-gray-200 rounded"></div>
-          </div>
-        </div>
+        <FolderGridSkeleton />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
@@ -229,11 +229,12 @@ const Folders = () => {
 
       {/* Create Folder Modal - responsive padding and width */}
       {showCreateFolderModal && (
-        <LibraryDialog title="New folder" onClose={() => setShowCreateFolderModal(false)}>
+        <LibraryDialog busy={creating} title="New folder" onClose={() => setShowCreateFolderModal(false)}>
             <div className="mb-4">
               <label htmlFor="folderName" className="mb-2 block text-sm font-medium">Folder name</label>
               <input
                 type="text"
+                disabled={creating}
                 id="folderName"
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
@@ -246,6 +247,7 @@ const Folders = () => {
             <div className="flex flex-col sm:flex-row justify-center gap-3">
               <button
                 type="button"
+                disabled={creating}
                 onClick={() => {
                   setShowCreateFolderModal(false);
                   setNewFolderName("");
@@ -258,9 +260,9 @@ const Folders = () => {
                 type="button"
                 onClick={handleCreateFolder}
                 className="px-4 py-2 text-base font-medium text-white bg-customPrimary rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-customPrimary order-1 sm:order-2"
-                disabled={!newFolderName.trim()}
+                disabled={creating || !newFolderName.trim()}
               >
-                Create
+                {creating ? 'Creating…' : 'Create'}
               </button>
             </div>
         </LibraryDialog>

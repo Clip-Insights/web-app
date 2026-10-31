@@ -1,3 +1,4 @@
+import { FileListSkeleton } from '../../components/Loading/Skeletons';
 import useBulkFileActions from '../../hooks/useBulkFileActions';
 import LibraryLoadError from "../../components/Cards/LibraryLoadError";
 import { useState, useRef, useEffect } from "react";
@@ -21,11 +22,14 @@ const Files = () => {
   const [files, setFiles] = useState([]);
   const bulkAction = useBulkFileActions(setFiles, folder_id);
   const [folders, setFolders] = useState([]);
+  const [foldersLoading, setFoldersLoading] = useState(true);
+  const [foldersError, setFoldersError] = useState(false);
   const [alert, setAlert] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortType, setSortType] = useState("Latest");
   const [title, setTitle] = useState("All files");
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -45,6 +49,8 @@ const Files = () => {
   }, [folder_id]);
 
   const fetchFolders = async () => {
+    setFoldersLoading(true);
+    setFoldersError(false);
     try {
       const response = await authRequest({
         method: "get",
@@ -54,8 +60,11 @@ const Files = () => {
       console.log("Folders fetched:", response.data);
       setFolders(response.data);
     } catch (error) {
+      setFoldersError(true);
       console.error("Error fetching folders:", error);
       showAlert("Failed to fetch folders", "error");
+    } finally {
+      setFoldersLoading(false);
     }
   };
 
@@ -116,6 +125,7 @@ const Files = () => {
     } catch (error) {
       console.error("Error renaming file:", error);
       showAlert("Failed to rename file", "error");
+      throw error;
     }
   };
 
@@ -123,8 +133,7 @@ const Files = () => {
     const fileIndex = files.findIndex((file) => file.name === fileName);
     const file = files[fileIndex];
 
-      // Simulate API request
-      authRequest({
+      return authRequest({
         method: "delete",
         url: getApiUrl("userspace/files/"),
         data: { file_id: file.id }
@@ -188,7 +197,7 @@ const Files = () => {
     const uploadedFile = e.target.files[0]; // Get the first file only
 
     if (uploadedFile) {
-      setLoading(true);
+      setUploading(true);
       const formData = new FormData();
       formData.append("file", uploadedFile); // Append a single file
 
@@ -225,7 +234,7 @@ const Files = () => {
         const detail = error.response?.data;
         showAlert(detail?.message || detail?.error || "Failed to upload file", "error");
       } finally {
-        setLoading(false);
+        setUploading(false);
       }
     }
 
@@ -272,22 +281,17 @@ const Files = () => {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <LibraryToolbar title={title} description="Your saved PDFs, ready for another look." count={sortedFiles.length} query={searchQuery} onQueryChange={setSearchQuery} sort={sortType} onSortChange={setSortType} sortOptions={sortOptions} action={<button onClick={handleUpload} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"><Upload size={16} aria-hidden="true" />Upload PDF</button>}>
+      <LibraryToolbar loading={loading} title={title} description="Your saved PDFs, ready for another look." count={sortedFiles.length} query={searchQuery} onQueryChange={setSearchQuery} sort={sortType} onSortChange={setSortType} sortOptions={sortOptions} action={<button disabled={uploading} aria-busy={uploading} onClick={handleUpload} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"><Upload size={16} aria-hidden="true" />{uploading ? 'Uploading…' : 'Upload PDF'}</button>}>
         {folder_id !== -1 && <Link to="/folders" className="mb-5 inline-block rounded text-sm text-auth-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">← All folders</Link>}
       </LibraryToolbar>
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,application/pdf" className="hidden" />
 
       {/* Library content */}
       {loadError ? <LibraryLoadError /> : loading ? (
-        <div className="col-span-full flex items-center justify-center py-8">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="h-8 w-8 bg-gray-200 rounded-full mb-2"></div>
-            <div className="h-4 w-32 bg-gray-200 rounded"></div>
-          </div>
-        </div>
+        <FileListSkeleton />
       ) : (
         <>
-          {sortedFiles.length > 0 && <FileList onBulkAction={bulkAction} key={`${folder_id}:${searchQuery}:${sortType}`} files={sortedFiles} label={title} onRename={handleRename} onDelete={handleDelete} onMove={handleMove} folders={folders} />}
+          {sortedFiles.length > 0 && <FileList onBulkAction={bulkAction} key={`${folder_id}:${searchQuery}:${sortType}`} files={sortedFiles} label={title} onRename={handleRename} onDelete={handleDelete} onMove={handleMove} folders={folders} foldersLoading={foldersLoading} foldersError={foldersError} onRetryFolders={fetchFolders} />}
 
           {sortedFiles.length === 0 && (
             <div className="text-center py-8 sm:py-12 text-gray-500">

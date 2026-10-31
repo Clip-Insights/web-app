@@ -1,4 +1,4 @@
-import PropTypes from 'prop-types';
+import { UsageSkeleton, StorageSkeleton, Skeleton } from '../../components/Loading/Skeletons';
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getApiUrl } from "../../services/apiService";
@@ -14,46 +14,33 @@ const greetingForNow = () => {
   return "Good evening";
 };
 
-const SkeletonCard = ({ className = "" }) => (
-  <div className={`bg-white border border-gray-200 rounded-2xl p-6 animate-pulse ${className}`}>
-    <div className="h-4 bg-gray-100 rounded w-40 mb-6"></div>
-    {[1, 2, 3].map((row) => (
-      <div key={row} className="mb-5">
-        <div className="flex justify-between mb-2">
-          <div className="h-3 bg-gray-100 rounded w-32"></div>
-          <div className="h-3 bg-gray-100 rounded w-10"></div>
-        </div>
-        <div className="h-2 bg-gray-100 rounded-full w-full"></div>
-      </div>
-    ))}
-  </div>
-);
-
-SkeletonCard.propTypes = { className: PropTypes.string };
-
 const Dashboard = () => {
   const { authRequest } = useAuth();
   const [name, setName] = useState("");
   const [storageData, setStorageData] = useState(null);
   const [planData, setPlanData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [planLoading, setPlanLoading] = useState(true);
+  const [storageLoading, setStorageLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
 
-    const loadProfile = authRequest({ method: "get", url: getApiUrl("account/profile/") })
+    authRequest({ method: "get", url: getApiUrl("account/profile/") })
       .then((response) => {
         if (!cancelled && response.data?.name) setName(response.data.name);
       })
-      .catch((error) => console.error("Error fetching profile:", error));
+      .catch((error) => console.error("Error fetching profile:", error))
+      .finally(() => { if (!cancelled) setProfileLoading(false); });
 
-    const loadPlan = fetchMyPlan(authRequest)
+    fetchMyPlan(authRequest)
       .then((data) => {
         if (!cancelled && data?.plan) setPlanData(data);
       })
-      .catch((error) => console.error("Error fetching plan usage:", error));
+      .catch((error) => console.error("Error fetching plan usage:", error))
+      .finally(() => { if (!cancelled) setPlanLoading(false); });
 
-    const loadStorage = authRequest({ method: "get", url: getApiUrl("userspace/storage-info") })
+    authRequest({ method: "get", url: getApiUrl("userspace/storage-info") })
       .then((response) => {
         if (cancelled || response.data?.message !== "success") return;
         setStorageData({
@@ -61,11 +48,8 @@ const Dashboard = () => {
           usedMb: (response.data.used_space / (1024 * 1024)).toFixed(1),
         });
       })
-      .catch((error) => console.error("Error fetching storage data:", error));
-
-    Promise.allSettled([loadProfile, loadPlan, loadStorage]).then(() => {
-      if (!cancelled) setLoading(false);
-    });
+      .catch((error) => console.error("Error fetching storage data:", error))
+      .finally(() => { if (!cancelled) setStorageLoading(false); });
 
     return () => {
       cancelled = true;
@@ -83,20 +67,14 @@ const Dashboard = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-semibold tracking-tight text-auth-ink">
           {greetingForNow()}
-          {name ? `, ${name.split(" ")[0]}` : ""}
+          {profileLoading ? <span className="ml-2 inline-block align-middle" role="status" aria-label="Loading your name"><Skeleton className="h-7 w-24" /></span> : name ? `, ${name.split(" ")[0]}` : ""}
         </h1>
         <p className="text-sm text-auth-muted mt-1">{today}</p>
       </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <SkeletonCard className="lg:col-span-2" />
-          <SkeletonCard />
-        </div>
-      ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
           <div className="lg:col-span-2">
-            {planData ? (
+            {planLoading ? <UsageSkeleton /> : planData ? (
               <UsagePanel planName={planData.plan.name} usage={planData.usage} />
             ) : (
               <section className="h-full bg-white border border-gray-200 rounded-2xl p-6 flex items-center text-sm text-gray-500">
@@ -104,7 +82,7 @@ const Dashboard = () => {
               </section>
             )}
           </div>
-          {storageData ? (
+          {storageLoading ? <StorageSkeleton /> : storageData ? (
             <StorageCard usedMb={storageData.usedMb} totalMb={storageData.totalMb} />
           ) : (
             <section className="h-full bg-white border border-gray-200 rounded-2xl p-6 flex items-center text-sm text-gray-500">
@@ -112,7 +90,6 @@ const Dashboard = () => {
             </section>
           )}
         </div>
-      )}
 
       <RecentFiles />
     </div>

@@ -1,3 +1,4 @@
+import { FileListSkeleton } from '../../components/Loading/Skeletons';
 import useBulkFileActions from '../../hooks/useBulkFileActions';
 import LibraryLoadError from "../../components/Cards/LibraryLoadError";
 import { useState, useEffect } from 'react'
@@ -13,7 +14,9 @@ const RecentFiles = () => {
     const { authRequest } = useAuth()
     const [files, setFiles] = useState([])
     const bulkAction = useBulkFileActions(setFiles);
-    const [folders, setFolders] = useState([])
+    const [folders, setFolders] = useState([]);
+    const [foldersLoading, setFoldersLoading] = useState(true);
+    const [foldersError, setFoldersError] = useState(false);
     const [alert, setAlert] = useState(null)
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState(false);
@@ -46,6 +49,8 @@ const RecentFiles = () => {
     }
 
     const fetchFolders = async () => {
+        setFoldersLoading(true);
+        setFoldersError(false);
         try {
             const response = await authRequest({
                 method: "get",
@@ -55,8 +60,11 @@ const RecentFiles = () => {
             console.log("Folders fetched:", response.data)
             setFolders(response.data)
         } catch (error) {
+            setFoldersError(true);
             console.error("Error fetching folders:", error)
             showAlert("Failed to fetch folders", "error")
+        } finally {
+            setFoldersLoading(false);
         }
     }
 
@@ -95,6 +103,7 @@ const RecentFiles = () => {
         } catch (error) {
             console.error("Error renaming file:", error)
             showAlert("Failed to rename file", "error")
+      throw error;
         }
     }
 
@@ -172,11 +181,9 @@ const RecentFiles = () => {
             </div>
 
             {loadError ? <LibraryLoadError /> : loading ? (
-                <div className="space-y-3 rounded-xl border border-auth-line bg-white p-5" role="status" aria-label="Loading recent files">
-                    {[1, 2, 3, 4].map(row => <div key={row} className="h-10 animate-pulse rounded-md bg-auth-panel motion-reduce:animate-none" />)}
-                </div>
+                <FileListSkeleton compact />
             ) : files.length > 0 ? (
-                <FileList onBulkAction={bulkAction} files={files} compact label="Recently saved" onRename={handleRename} onDelete={handleDelete} onMove={handleMove} folders={folders} />
+                <FileList onBulkAction={bulkAction} files={files} compact label="Recently saved" onRename={handleRename} onDelete={handleDelete} onMove={handleMove} folders={folders} foldersLoading={foldersLoading} foldersError={foldersError} onRetryFolders={fetchFolders} />
             ) : null}
 
             {!loading && !loadError && files.length === 0 && (

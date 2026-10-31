@@ -35,7 +35,7 @@ export default function FileList({ files, compact = false, label = 'Saved files'
           <button type="button" disabled={busy} onClick={() => setDialog('move')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-auth-line bg-white px-3 text-sm text-auth-ink hover:bg-auth-panel disabled:opacity-50"><FolderInput size={16} />Move</button>
           <button type="button" disabled={busy} onClick={() => setDialog('delete')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-auth-line bg-white px-3 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"><Trash2 size={16} />Delete</button>
           <button type="button" disabled={busy} onClick={clear} aria-label="Clear selection" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-auth-panel"><X size={16} /></button>
-        {busy && <span role="status">Updating filesâ€¦</span>}
+        {busy && <span role="status">Updating files…</span>}
       </div>}
       {feedback && <p role="status" className="mb-3 text-sm text-auth-muted">{feedback}</p>}
     <div className="rounded-xl border border-auth-line bg-white">
@@ -61,10 +61,10 @@ export default function FileList({ files, compact = false, label = 'Saved files'
         </tbody>
       </table>
     </div>
-    {dialog === 'move' && <MovePopup folders={actions.folders || []} onSelect={(id) => run('move', id)} onCancel={() => setDialog(null)} isLoading={busy} />}
+    {dialog === 'move' && <MovePopup foldersLoading={actions.foldersLoading} foldersError={actions.foldersError} onRetryFolders={actions.onRetryFolders} folders={actions.folders || []} onSelect={(id) => run('move', id)} onCancel={() => setDialog(null)} isLoading={busy} />}
     {dialog === 'delete' && <LibraryDialog title={`Delete ${selected.length} ${selected.length === 1 ? 'file' : 'files'}?`} onClose={() => setDialog(null)} busy={busy}>
       <p className="text-sm leading-6 text-auth-muted">This permanently deletes the selected files from your account.</p>
-      <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={busy} onClick={() => setDialog(null)} className="min-h-11 rounded-lg border border-auth-line px-4 text-sm">Cancel</button><button type="button" disabled={busy} onClick={() => run('delete')} className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Deletingâ€¦' : 'Delete files'}</button></div>
+      <div className="mt-6 flex justify-end gap-3"><button type="button" disabled={busy} onClick={() => setDialog(null)} className="min-h-11 rounded-lg border border-auth-line px-4 text-sm">Cancel</button><button type="button" disabled={busy} onClick={() => run('delete')} className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Deleting…' : 'Delete files'}</button></div>
     </LibraryDialog>}
     </section>
   );
@@ -76,4 +76,5 @@ FileList.propTypes = {
   label: PropTypes.string,
   onBulkAction: PropTypes.func,
   folders: PropTypes.array,
+  foldersLoading: PropTypes.bool, foldersError: PropTypes.bool, onRetryFolders: PropTypes.func,
 };

@@ -1,3 +1,4 @@
+import { Skeleton } from '../Loading/Skeletons';
 import { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Folder } from 'lucide-react';
@@ -7,7 +8,7 @@ import RenamePopup from './RenamePopup';
 import MovePopup from './MovePopup';
 import CardActions from './CardActions';
 
-export default function FileCard({ file, onRename, onDelete, onMove, folders = [], compact = false, selection }) {
+export default function FileCard({ file, onRename, onDelete, onMove, folders = [], compact = false, selection, foldersLoading = false, foldersError = false, onRetryFolders }) {
   const [dialog, setDialog] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,27 +40,27 @@ export default function FileCard({ file, onRename, onDelete, onMove, folders = [
           <span className="min-w-0">
             <h2 className="line-clamp-2 break-words text-sm font-medium leading-5 text-auth-ink group-hover:text-auth-accent" title={file.name}>{name}</h2>
             <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs tabular-nums text-auth-muted">
-              {hasFolder ? <span className="inline-flex min-w-0 items-center gap-1.5" title={folderName ? `Folder: ${folderName}` : 'Folder name unavailable'}><Folder size={12} className="shrink-0" aria-hidden="true" /><span className="max-w-48 truncate">{folderName || 'In a folder'}</span></span> : <span className="text-auth-subtle">No folder</span>}
+              {hasFolder ? (foldersLoading && !folderName ? <span role="status" aria-label="Loading folder name"><Skeleton className="h-3 w-24" /></span> : <span className="inline-flex min-w-0 items-center gap-1.5" title={folderName ? `Folder: ${folderName}` : 'Folder name unavailable'}><Folder size={12} className="shrink-0" aria-hidden="true" /><span className="max-w-48 truncate">{folderName || (foldersError ? 'Folder unavailable' : 'In a folder')}</span></span>) : <span className="text-auth-subtle">No folder</span>}
               {compact && size && <span>{size}</span>}
               {!compact && size && <span className="sm:hidden">{size}</span>}
               <span className="md:hidden">{dateLabel || ''}</span>
-              {loading && <span role="status">Movingâ€¦</span>}
+              {loading && <span role="status">Updating…</span>}
             </span>
           </span>
         </a>
       </td>
-      <td className="hidden border-t border-auth-line px-3 py-3 align-middle text-xs tabular-nums text-auth-muted md:table-cell">{dateLabel || 'â€”'}</td>
-      {!compact && <td className="hidden border-t border-auth-line px-3 py-3 text-right align-middle text-xs tabular-nums text-auth-muted sm:table-cell">{size || 'â€”'}</td>}
+      <td className="hidden border-t border-auth-line px-3 py-3 align-middle text-xs tabular-nums text-auth-muted md:table-cell">{dateLabel || '—'}</td>
+      {!compact && <td className="hidden border-t border-auth-line px-3 py-3 text-right align-middle text-xs tabular-nums text-auth-muted sm:table-cell">{size || '—'}</td>}
       <td className="relative border-t border-auth-line align-middle">
         <CardActions name={file.name} disabled={loading || selection?.disabled} actions={[
           { label: 'Rename', onClick: () => setDialog('rename') },
           { label: 'Move to folder', onClick: () => { setError(null); setDialog('move'); } },
-          { label: 'Delete', destructive: true, onClick: () => onDelete(file.name) },
+          { label: 'Delete', destructive: true, onClick: async () => { setLoading(true); try { await onDelete(file.name); } finally { setLoading(false); } } },
         ]} />
-      {dialog === 'rename' && <RenamePopup fileName={name} onCancel={() => setDialog(null)} onRename={(value) => { if (value && value !== name) onRename(file.name, lastDot > 0 ? `${value}.${extension}` : value); setDialog(null); }} />}
-      {dialog === 'move' && <MovePopup error={error} folders={folders} onSelect={move} onCancel={() => setDialog(null)} isLoading={loading} />}
+      {dialog === 'rename' && <RenamePopup fileName={name} onCancel={() => setDialog(null)} onRename={async (value) => { if (value && value !== name) await onRename(file.name, lastDot > 0 ? `${value}.${extension}` : value); setDialog(null); }} />}
+      {dialog === 'move' && <MovePopup foldersLoading={foldersLoading} foldersError={foldersError} onRetryFolders={onRetryFolders} error={error} folders={folders} onSelect={move} onCancel={() => setDialog(null)} isLoading={loading} />}
       </td>
     </tr>
   );
 }
-FileCard.propTypes = { file: PropTypes.shape({ id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]), name: PropTypes.string.isRequired, path: PropTypes.string, size: PropTypes.number, created_date: PropTypes.string, folder_id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) }).isRequired, onRename: PropTypes.func.isRequired, onDelete: PropTypes.func.isRequired, onMove: PropTypes.func, folders: PropTypes.array, compact: PropTypes.bool, selection: PropTypes.shape({ checked: PropTypes.bool, disabled: PropTypes.bool, onSelect: PropTypes.func.isRequired }) };
+FileCard.propTypes = { foldersLoading: PropTypes.bool, foldersError: PropTypes.bool, onRetryFolders: PropTypes.func, file: PropTypes.shape({ id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]), name: PropTypes.string.isRequired, path: PropTypes.string, size: PropTypes.number, created_date: PropTypes.string, folder_id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]) }).isRequired, onRename: PropTypes.func.isRequired, onDelete: PropTypes.func.isRequired, onMove: PropTypes.func, folders: PropTypes.array, compact: PropTypes.bool, selection: PropTypes.shape({ checked: PropTypes.bool, disabled: PropTypes.bool, onSelect: PropTypes.func.isRequired }) };

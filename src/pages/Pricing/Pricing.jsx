@@ -1,3 +1,4 @@
+import { PricingSkeleton, Skeleton } from '../../components/Loading/Skeletons';
 import PropTypes from 'prop-types';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -44,6 +45,10 @@ function PlanCard({
   isAuthenticated,
   subscription,
   busy,
+  detailsLoading = false,
+  accountError = false,
+  cancelBusy = false,
+  checkoutPending = false,
   onUpgrade,
   onCancel,
 }) {
@@ -87,7 +92,7 @@ function PlanCard({
       <p className="mt-2 text-sm text-auth-muted min-h-[40px]">{plan.description}</p>
 
       <div className="mt-4 mb-6">
-        {isCurrent ? (
+        {detailsLoading ? <div role="status" aria-label={`Loading ${plan.name} plan options`}><Skeleton className="h-11 w-full rounded-lg" /></div> : accountError ? <button disabled className="min-h-11 w-full rounded-lg bg-auth-panel text-sm text-auth-muted">Plan status unavailable</button> : isCurrent ? (
           <div>
             <span className="block w-full text-center py-2.5 rounded-lg border border-customPrimary text-auth-accent font-medium text-sm">
               Your current plan
@@ -95,9 +100,10 @@ function PlanCard({
             {isPaid && subscription?.status === 'active' && !subscription?.cancel_at_period_end && (
               <button
                 onClick={onCancel}
+                disabled={cancelBusy || checkoutPending}
                 className="mt-2 w-full text-center text-xs text-auth-muted hover:text-red-500 underline"
               >
-                Cancel subscription (keeps access until period end)
+                {cancelBusy ? 'Cancelling…' : 'Cancel subscription (keeps access until period end)'}
               </button>
             )}
             {isPaid && subscription?.cancel_at_period_end && (
@@ -109,7 +115,7 @@ function PlanCard({
         ) : purchasable ? (
           <button
             onClick={() => onUpgrade(plan)}
-            disabled={busy}
+            disabled={busy || cancelBusy || checkoutPending}
             className={`block w-full py-2.5 rounded-lg font-medium text-sm transition-colors text-white ${
               busy
                 ? 'bg-gray-300 cursor-wait'
@@ -155,6 +161,7 @@ PlanCard.propTypes = {
   plan: PropTypes.shape({ slug: PropTypes.string, name: PropTypes.string, monthly_price_usd: PropTypes.oneOfType([PropTypes.string, PropTypes.number]), description: PropTypes.string }).isRequired,
   purchase: PropTypes.shape({ annual_price_usd: PropTypes.oneOfType([PropTypes.string, PropTypes.number]), paddle_price_id_annual: PropTypes.string, paddle_price_id_monthly: PropTypes.string }),
   cycle: PropTypes.string.isRequired, highlighted: PropTypes.bool, currentSlug: PropTypes.string,
+  detailsLoading: PropTypes.bool, accountError: PropTypes.bool, cancelBusy: PropTypes.bool, checkoutPending: PropTypes.bool,
   isAuthenticated: PropTypes.bool, busy: PropTypes.bool, onUpgrade: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired,
   subscription: PropTypes.shape({ status: PropTypes.string, cancel_at_period_end: PropTypes.bool, current_period_end: PropTypes.string }),
 };
@@ -169,47 +176,44 @@ const Pricing = () => {
   const [cycle, setCycle] = useState('monthly');
   const [busyPlan, setBusyPlan] = useState(null);
   const [error, setError] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [accountLoading, setAccountLoading] = useState(isAuthenticated);
+  const [accountError, setAccountError] = useState(false);
+  const [billingError, setBillingError] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
-  const refreshMine = useCallback(async () => {
+  const refreshMine = useCallback(async (active = () => true) => {
     if (!isAuthenticated) return;
     try {
       const mine = await fetchMyPlan(authRequest);
-      setCurrentSlug(mine?.plan?.slug ?? null);
-      setSubscription(await fetchSubscription(authRequest));
+      if (active()) { setCurrentSlug(mine?.plan?.slug ?? null); setAccountError(false); }
+      const nextSubscription = await fetchSubscription(authRequest);
+      if (active()) setSubscription(nextSubscription);
     } catch (e) {
-      console.error('Failed to load current plan:', e);
-    }
+      if (active()) setAccountError(true);
+      console.error('Failed to load account billing:', e);
+    } finally { if (active()) setAccountLoading(false); }
   }, [isAuthenticated, authRequest]);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      setError(false);
-      try {
-        const catalogue = await fetchPlans();
-        if (cancelled) return;
-        setPlans(catalogue);
-        // Purchase metadata is optional: without it, paid plans simply show
-        // "Coming soon" instead of a checkout button.
-        try {
-          const purchases = await fetchBillingCatalog();
-          if (!cancelled) setCatalog(Object.fromEntries(purchases.map((c) => [c.plan_slug, c])));
-        } catch (e) {
-          console.error('Billing catalog unavailable:', e);
-        }
-        if (isAuthenticated && !cancelled) await refreshMine();
-      } catch (e) {
-        console.error('Failed to load pricing:', e);
-        if (!cancelled) setError(true);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, refreshMine]);
+    setError(false); setBillingError(false); setCatalogLoading(true);
+    setAccountLoading(isAuthenticated); setAccountError(false);
+    fetchPlans()
+      .then(value => { if (!cancelled) setPlans(value); })
+      .catch(() => { if (!cancelled) setError(true); });
+    fetchBillingCatalog()
+      .then(value => { if (!cancelled) setCatalog(Object.fromEntries(value.map(item => [item.plan_slug, item]))); })
+      .catch(() => { if (!cancelled) setBillingError(true); })
+      .finally(() => { if (!cancelled) setCatalogLoading(false); });
+    if (isAuthenticated) refreshMine(() => !cancelled);
+    else { setCurrentSlug(null); setSubscription(null); }
+    return () => { cancelled = true; };
+  }, [isAuthenticated, refreshMine, attempt]);
 
   const handleUpgrade = async (plan) => {
+    if (busyPlan || cancelBusy) return;
     if (!isAuthenticated) {
       navigate('/login');
       return;
@@ -237,13 +241,15 @@ const Pricing = () => {
   };
 
   const handleCancel = async () => {
+    if (cancelBusy || busyPlan) return;
+    setCancelBusy(true);
     try {
       const result = await cancelSubscription(authRequest);
       toast.success(result.msg || 'Subscription will end at the current period.');
       await refreshMine();
     } catch (e) {
       toast.error(e.response?.data?.error || 'Cancellation failed. Try again.');
-    }
+    } finally { setCancelBusy(false); }
   };
 
   const guest = plans?.find((p) => p.slug === 'guest');
@@ -252,13 +258,13 @@ const Pricing = () => {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-6 flex min-h-16 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0"><h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-auth-ink">A plan for the way you learn.</h1>
         <p className="mt-2 text-sm text-auth-muted">
           Keep your essentials free, or choose more AI usage and storage.
         </p></div>
 
-        {hasPurchases && (
+        {catalogLoading ? <div role="status" aria-label="Loading billing options"><Skeleton className="h-12 w-48 rounded-full" /></div> : hasPurchases && (
           <div className="inline-flex w-fit shrink-0 items-center rounded-full border border-auth-line bg-auth-panel p-1">
             {['monthly', 'annual'].map((option) => (
               <button
@@ -291,13 +297,8 @@ const Pricing = () => {
         </div>
       )}
 
-      {!plans && !error && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-96 bg-gray-100 rounded-xl border" />
-          ))}
-        </div>
-      )}
+      {!plans && !error && <PricingSkeleton />}
+      {(billingError || accountError) && !error && <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-auth-line bg-white p-4 text-sm text-auth-muted"><p>Some billing details couldn’t be loaded. Please retry before choosing a plan.</p><button type="button" onClick={() => setAttempt(value => value + 1)} className="min-h-11 rounded-lg border border-auth-line px-4 hover:bg-auth-panel">Retry billing</button></div>}
 
       {plans && (
         <>
@@ -313,6 +314,10 @@ const Pricing = () => {
                 isAuthenticated={isAuthenticated}
                 subscription={currentSlug === plan.slug ? subscription : null}
                 busy={busyPlan === plan.slug}
+                detailsLoading={catalogLoading || accountLoading}
+                accountError={accountError || billingError}
+                cancelBusy={cancelBusy}
+                checkoutPending={Boolean(busyPlan)}
                 onUpgrade={handleUpgrade}
                 onCancel={handleCancel}
               />
