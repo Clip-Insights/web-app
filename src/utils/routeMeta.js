@@ -11,10 +11,11 @@ const routeMeta = {
     title: 'Folders',
     subtitle: 'Organize your data efficiently.',
   },
-  '/products': {
-    title: 'Products',
-    subtitle: 'Manage your product inventory.',
+  '/get-started': {
+    title: 'Get started',
+    subtitle: 'Connect your extension and learning library.',
   },
+  '/settings': { title: 'Account settings', subtitle: '' },
   '/pricing': {
     title: 'Pricing',
     subtitle: 'Choose a plan that fits you.',

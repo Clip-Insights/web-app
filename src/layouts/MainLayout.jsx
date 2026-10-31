@@ -49,12 +49,12 @@ function MainLayout() {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-auth-panel font-primary text-auth-ink">
       {!shouldHideSidebar && (
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
       )}
 
-      <div className="flex-1 flex flex-col">
+      <div className="min-w-0 flex-1 flex flex-col">
         {!shouldHideSidebar && (
           <Header
             title={meta.title}
@@ -64,7 +64,7 @@ function MainLayout() {
             packagePlan={packagePlan}
           />
         )}
-        <main className={['/login', '/signup'].includes(location.pathname) ? 'flex-1' : 'flex-1 p-4 pt-0 sm:p-6 md:p-8'}>
+        <main className={['/login', '/signup'].includes(location.pathname) ? 'flex-1' : 'flex-1 p-4 sm:p-6 lg:px-8'}>
           <Outlet />
         </main>
       </div>

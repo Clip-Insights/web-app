@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getApiUrl } from "../../services/apiService";
@@ -27,6 +28,8 @@ const SkeletonCard = ({ className = "" }) => (
     ))}
   </div>
 );
+
+SkeletonCard.propTypes = { className: PropTypes.string };
 
 const Dashboard = () => {
   const { authRequest } = useAuth();
@@ -76,13 +79,13 @@ const Dashboard = () => {
   });
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="max-w-7xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-xl font-semibold text-gray-900">
+        <h1 className="text-3xl font-semibold tracking-tight text-auth-ink">
           {greetingForNow()}
-          {name ? `, ${name.split(" ")[0]}` : ""} 👋
+          {name ? `, ${name.split(" ")[0]}` : ""}
         </h1>
-        <p className="text-sm text-gray-400 mt-0.5">{today}</p>
+        <p className="text-sm text-auth-muted mt-1">{today}</p>
       </div>
 
       {loading ? (

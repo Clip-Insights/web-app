@@ -1,66 +1,13 @@
-// RenamePopup.jsx - Updated to be more generic
-import React, { useState, useEffect, useRef } from "react";
+import { useState } from 'react';
+import PropTypes from 'prop-types';
+import LibraryDialog from './LibraryDialog';
 
-const RenamePopup = ({
-  fileName,
-  onRename,
-  onCancel,
-  title = "Rename File",
-  label = "File Name",
-}) => {
-  const [newName, setNewName] = useState(fileName);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    // Focus on the input field when the component mounts
-    if (inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, []);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onRename(newName.trim());
-  };
-
-  return (
-    <div className="fixed inset-0 bg-slate-950 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4">
-        <h2 className="text-lg font-semibold mb-3">{title}</h2>
-
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <input
-              ref={inputRef}
-              type="text"
-              id="itemName"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              className="w-full px-4 py-2 border rounded-3xl focus:outline-none focus:ring-1 focus:ring-customPrimary placeholder-gray-150 text-md"
-            />
-          </div>
-
-          <div className="flex justify-center space-x-3">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 w-44 text-base font-medium text-customPrimary border-customPrimary border-1 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-customPrimary"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 w-44 text-base font-medium text-white bg-customPrimary rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-customPrimary"
-              disabled={!newName.trim() || newName.trim() === fileName}
-            >
-              Rename
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-export default RenamePopup;
+export default function RenamePopup({ fileName, onRename, onCancel, title = 'Rename file', label = 'File name' }) {
+  const [name, setName] = useState(fileName);
+  return <LibraryDialog title={title} onClose={onCancel}><form onSubmit={(event) => { event.preventDefault(); if (name.trim() && name.trim() !== fileName) onRename(name.trim()); }}>
+    <label htmlFor="itemName" className="mb-2 block text-sm font-medium">{label}</label>
+    <input id="itemName" value={name} onChange={(event) => setName(event.target.value)} autoFocus className="h-12 w-full rounded-lg border border-auth-field px-3 text-sm focus:border-auth-accent focus:outline-none focus:ring-1 focus:ring-auth-accent" />
+    <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={onCancel} className="min-h-11 rounded-lg border border-auth-line px-4 text-sm hover:bg-auth-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Cancel</button><button type="submit" disabled={!name.trim() || name.trim() === fileName} className="min-h-11 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent">Save name</button></div>
+  </form></LibraryDialog>;
+}
+RenamePopup.propTypes = { fileName: PropTypes.string.isRequired, onRename: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired, title: PropTypes.string, label: PropTypes.string };

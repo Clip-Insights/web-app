@@ -9,7 +9,8 @@ import ResetPasswordEmail from "../pages/ResetPassword/ResetPasswordEmail";
 import ResetPasswordNew from "../pages/ResetPassword/ResetPasswordNew";
 import Files from "../pages/Files/Files";
 import Folders from "../pages/Folders/Folders";
-import ComingSoon from "../pages/Static/ComingSoon";
+import GetStarted from "../pages/Static/GetStarted";
+import Settings from "../pages/Settings/Settings";
 import Pricing from "../pages/Pricing/Pricing";
 import PageNotFound from "../pages/Static/PageNotFound";
 import VerifyEmail from "../pages/VerifyEmail/VerifyEmail";
@@ -38,12 +39,14 @@ const router = createBrowserRouter(
         <Route path="signup" element={<Signup />} />
         <Route path="login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPasswordEmail />} />
-        <Route path="/products" element={<ComingSoon />} />
+        <Route path="/get-started" element={<GetStarted />} />
+        <Route path="/products" element={<Navigate to="/get-started" replace />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/reset-password/:uid/:token" element={<ResetPasswordNew />} />
 
-        // Protected Routes
+        {/* Protected routes */}
         <Route path="" element={<AuthGuard> <Dashboard /> </AuthGuard>} />
+        <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
         <Route path="folders" element={<AuthGuard> <Folders /> </AuthGuard>} />
         <Route path="/files/:folder_id?" element={<AuthGuard> <Files /> </AuthGuard>} />
 

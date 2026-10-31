@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="405" viewBox="0 0 720 405">
+<rect width="720" height="405" fill="#202331"/>
+<g stroke="#343848" stroke-width="1"><path d="M60 80H660M60 140H660M60 200H660M60 260H660M60 320H660M120 60V340M220 60V340M320 60V340M420 60V340M520 60V340M620 60V340"/></g>
+<text x="42" y="42" fill="#b5bad0" font-family="Arial,sans-serif" font-size="12" letter-spacing="2">THE IDEA, VISUALIZED</text>
+<path d="M100 105C195 100 200 310 365 310S545 100 640 95" fill="none" stroke="#f0c78b" stroke-width="4"/>
+<path d="M142 118L230 223L300 282L353 307" fill="none" stroke="#8e9bff" stroke-width="2" stroke-dasharray="5 7"/>
+<g fill="#8e9bff" stroke="#202331" stroke-width="4"><circle cx="142" cy="118" r="8"/><circle cx="230" cy="223" r="8"/><circle cx="300" cy="282" r="8"/><circle cx="353" cy="307" r="8"/></g>
+<circle cx="365" cy="310" r="15" fill="none" stroke="#f0c78b" stroke-width="1"/>
+<text x="410" y="237" fill="#f6f5f1" font-family="Arial,sans-serif" font-size="21">Small steps.</text><text x="410" y="267" fill="#f6f5f1" font-family="Arial,sans-serif" font-size="21">Better direction.</text>
+<text x="42" y="375" fill="#b5bad0" font-family="Arial,sans-serif" font-size="12">Gradient descent, explained</text><text x="627" y="375" fill="#b5bad0" font-family="Arial,sans-serif" font-size="12">02:14</text>
+</svg>

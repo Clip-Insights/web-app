@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { Search, ChevronDown, FolderPlus } from "lucide-react";
+import LibraryLoadError from "../../components/Cards/LibraryLoadError";
+import { useState, useEffect } from "react";
+import { FolderPlus } from "lucide-react";
 import FolderCard from "../../components/Cards/FolderCard";
 import Alert from "../../components/Cards/Alert";
-import Header from "../../components/Header/Header";
+import LibraryDialog from "../../components/Cards/LibraryDialog";
+import LibraryToolbar from "../../components/Cards/LibraryToolbar";
 import { useAuth } from "../../context/AuthContext";
 import { getApiUrl } from "../../services/apiService";
 import { useNavigate } from "react-router-dom";
@@ -14,29 +16,11 @@ const Folders = () => {
   const [alert, setAlert] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortType, setSortType] = useState("Latest");
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const navigate = useNavigate();
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        showSortDropdown && 
-        sortDropdownRef.current && 
-        !sortDropdownRef.current.contains(event.target)
-      ) {
-        setShowSortDropdown(false);
-      }
-    };
-    
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showSortDropdown]);
 
   useEffect(() => {
     const fetchFolders = async () => {
@@ -51,6 +35,7 @@ const Folders = () => {
         setFolders(response.data);
       } catch (error) {
         showAlert("Failed to fetch folders", "error");
+        setLoadError(true);
         console.error("Error fetching folders:", error);
       } finally {
         setLoading(false);
@@ -58,7 +43,7 @@ const Folders = () => {
     };
 
     fetchFolders();
-  }, []);
+  }, [authRequest]);
 
   const showAlert = (message, type = "success") => {
     setAlert({ message, type });
@@ -200,68 +185,11 @@ const Folders = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-      {/* Top Controls - Stack vertically on mobile, horizontally on larger screens */}
-      <div className="flex flex-col gap-3 mb-4 sm:mb-6 mt-3 sm:mt-6">
-        {/* Row 1: Create Folder + Search (splits into rows on smallest screens) */}
-        <div className="flex flex-col sm:flex-row gap-3 w-full">
-          <div className="w-full sm:w-auto order-2 sm:order-1">
-            <button
-              onClick={() => setShowCreateFolderModal(true)}
-              className="px-3 py-2 border border-customPrimary text-customPrimary rounded-lg flex items-center gap-2 hover:bg-blue-50 font-semibold w-full justify-center transition-colors"
-            >
-              <FolderPlus size={18} />
-              <span>Create New Folder</span>
-            </button>
-          </div>
-
-          <div className="relative w-full sm:flex-1 order-1 sm:order-2">
-            <input
-              type="text"
-              placeholder="Search folders..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-customPrimary"
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search size={18} className="text-gray-400" />
-            </div>
-          </div>
-          
-          {/* Sort Dropdown - Full width on mobile, auto width on larger screens */}
-          <div className="relative order-3 w-full sm:w-auto sm:min-w-[180px]">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowSortDropdown(!showSortDropdown);
-              }}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg flex items-center justify-between w-full"
-            >
-              <span>{sortType}</span> <ChevronDown size={16} />
-            </button>
-
-            {showSortDropdown && (
-              <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg">
-                {sortOptions.map((option) => (
-                  <button
-                    key={option}
-                    className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                    onClick={() => {
-                      setSortType(option);
-                      setShowSortDropdown(false);
-                    }}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-7xl">
+      <LibraryToolbar title="Folders" description="A little structure for everything you’re learning." count={sortedFolders.length} query={searchQuery} onQueryChange={setSearchQuery} sort={sortType} onSortChange={setSortType} sortOptions={sortOptions} action={<button onClick={() => setShowCreateFolderModal(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"><FolderPlus size={17} aria-hidden="true" />New folder</button>} />
 
       {/* Folders Grid with loading state handling similar to RecentFiles */}
-      {loading ? (
+      {loadError ? <LibraryLoadError /> : loading ? (
         <div className="col-span-full flex items-center justify-center py-8">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-gray-200 rounded-full mb-2"></div>
@@ -270,7 +198,7 @@ const Folders = () => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
             {sortedFolders.map((folder) => (
               <div key={folder.id} className="w-full">
                 <FolderCard
@@ -293,7 +221,7 @@ const Folders = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
               </div>
-              <p className="text-center">No folders found. Try adjusting your search or create a new folder.</p>
+              <p className="text-center">{searchQuery ? 'No matching folders. Try another name.' : 'Create a folder for your next course, project, or idea.'}</p>
             </div>
           )}
         </>
@@ -301,11 +229,9 @@ const Folders = () => {
 
       {/* Create Folder Modal - responsive padding and width */}
       {showCreateFolderModal && (
-        <div className="fixed inset-0 bg-slate-950 bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-0">
-          <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-md mx-auto">
-            <h2 className="text-xl font-semibold mb-4">Create New Folder</h2>
-
+        <LibraryDialog title="New folder" onClose={() => setShowCreateFolderModal(false)}>
             <div className="mb-4">
+              <label htmlFor="folderName" className="mb-2 block text-sm font-medium">Folder name</label>
               <input
                 type="text"
                 id="folderName"
@@ -337,8 +263,7 @@ const Folders = () => {
                 Create
               </button>
             </div>
-          </div>
-        </div>
+        </LibraryDialog>
       )}
 
       {/* Fixed position alert for consistent visibility */}

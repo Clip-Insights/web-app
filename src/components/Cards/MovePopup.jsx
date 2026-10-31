@@ -1,49 +1,13 @@
-import React from "react";
-import { Folder } from "lucide-react";
+import PropTypes from 'prop-types';
+import { Folder, ArrowRight } from 'lucide-react';
+import LibraryDialog from './LibraryDialog';
 
-const MovePopup = ({ folders, onSelect, onCancel, isLoading = false }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-80 overflow-y-auto">
-        <h3 className="text-lg font-semibold mb-4">Move to Folder</h3>
-        
-        {isLoading ? (
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="mt-2 text-sm text-gray-600">Moving file...</p>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {folders.length === 0 ? (
-                <p className="text-gray-500 text-center py-2">No folders found</p>
-              ) : (
-                folders.map((folder) => (
-                  <button
-                    key={folder.id}
-                    className="flex items-center w-full p-2 rounded hover:bg-gray-100 transition-colors"
-                    onClick={() => onSelect(folder.id)}
-                    disabled={isLoading}
-                  >
-                    <Folder size={20} className="text-yellow-500 mr-2" />
-                    <span className="text-left truncate">{folder.name}</span>
-                  </button>
-                ))
-              )}
-            </div>
-            <div className="mt-6 flex justify-end space-x-2">
-              <button
-                className="px-4 py-2 w-full mt-4 text-base font-medium text-customPrimary border-customPrimary border-1 rounded-md hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-customPrimary"                onClick={onCancel}
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default MovePopup;
+export default function MovePopup({ folders, onSelect, onCancel, isLoading = false, error }) {
+  return <LibraryDialog title="Move to folder" onClose={onCancel} busy={isLoading}>
+    <p className="mb-4 text-sm text-auth-muted">Choose a home for this file.</p>
+    {error && <p role="alert" className="mb-4 text-sm text-red-700">{error}</p>}
+    {isLoading ? <p role="status" className="py-6 text-center text-sm text-auth-muted">Moving your file…</p> : <div className="max-h-64 space-y-1 overflow-y-auto">{folders.length ? folders.map(folder => <button key={folder.id} onClick={() => onSelect(folder.id)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-3 text-left text-sm hover:bg-auth-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent"><Folder size={20} className="shrink-0 text-auth-accent" aria-hidden="true" /><span className="truncate">{folder.name}</span><ArrowRight size={16} className="ml-auto shrink-0 text-auth-muted" aria-hidden="true" /></button>) : <p className="py-4 text-sm text-auth-muted">No folders yet. Create one in Folders, then move your file here.</p>}</div>}
+    <button disabled={isLoading} onClick={onCancel} className="mt-6 min-h-11 w-full rounded-lg border border-auth-line text-sm hover:bg-auth-panel focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent disabled:opacity-50">Cancel</button>
+  </LibraryDialog>;
+}
+MovePopup.propTypes = { folders: PropTypes.arrayOf(PropTypes.shape({ id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]), name: PropTypes.string })).isRequired, onSelect: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired, isLoading: PropTypes.bool, error: PropTypes.string };

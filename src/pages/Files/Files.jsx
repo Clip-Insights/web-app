@@ -1,10 +1,13 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Search, ChevronDown, Upload, Plus, LogIn } from "lucide-react";
-import FileCard from "../../components/Cards/FileCard";
+import useBulkFileActions from '../../hooks/useBulkFileActions';
+import LibraryLoadError from "../../components/Cards/LibraryLoadError";
+import { useState, useRef, useEffect } from "react";
+import { Upload } from "lucide-react";
+import FileList from "../../components/Cards/FileList";
 import Alert from "../../components/Cards/Alert";
 import { getApiUrl } from "../../services/apiService";
 import { useAuth } from "../../context/AuthContext";
-import Header from "../../components/Header/Header";
+import LibraryToolbar from "../../components/Cards/LibraryToolbar";
+import { Link } from "react-router-dom";
 import { useParams } from 'react-router-dom';
 
 const Files = () => {
@@ -16,15 +19,15 @@ const Files = () => {
   
   const { authRequest } = useAuth();
   const [files, setFiles] = useState([]);
+  const bulkAction = useBulkFileActions(setFiles, folder_id);
   const [folders, setFolders] = useState([]);
   const [alert, setAlert] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortType, setSortType] = useState("Latest");
-  const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [title, setTitle] = useState("All Files");
+  const [title, setTitle] = useState("All files");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const fileInputRef = useRef(null);
-  const sortDropdownRef = useRef(null);
 
   useEffect(() => {
     // Fetch folder name and files from the API
@@ -32,7 +35,7 @@ const Files = () => {
     fetchFolderAndFiles(folder_id).then((data) => {
       if (data) {
         setFiles(data.files || []);
-        setTitle(data?.folder_name || "All Files");
+        setTitle(data?.folder_name || "All files");
       }
       setLoading(false);
     });
@@ -72,6 +75,7 @@ const Files = () => {
       console.log(response.data);
       return response.data;
     } catch (error) {
+      setLoadError(true);
       console.error("Error fetching folder and files:", error);
       showAlert("Failed to fetch folder and files", "error");
       return null;
@@ -170,11 +174,8 @@ const Files = () => {
     } catch (error) {
       console.error("Error moving file:", error);
       showAlert(error.response?.data?.error || "Failed to move file", "error");
+      throw error;
     }
-  };
-
-  const handleMoveSuccess = (message) => {
-    showAlert(message, "success");
   };
 
   const handleUpload = () => {
@@ -269,101 +270,15 @@ const Files = () => {
     "Size (Large-Small)",
   ];
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      // Only close if the dropdown is open and the click is outside the dropdown
-      if (
-        showSortDropdown && 
-        sortDropdownRef.current && 
-        !sortDropdownRef.current.contains(event.target)
-      ) {
-        setShowSortDropdown(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showSortDropdown]);
-
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-4 sm:mb-6 gap-3 mt-4 sm:mt-6">
-        <h1 className="text-xl sm:text-2xl font-semibold">{title}</h1>
+    <div className="mx-auto max-w-7xl">
+      <LibraryToolbar title={title} description="Your saved PDFs, ready for another look." count={sortedFiles.length} query={searchQuery} onQueryChange={setSearchQuery} sort={sortType} onSortChange={setSortType} sortOptions={sortOptions} action={<button onClick={handleUpload} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-auth-accent px-4 text-sm font-semibold text-white hover:bg-auth-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent"><Upload size={16} aria-hidden="true" />Upload PDF</button>}>
+        {folder_id !== -1 && <Link to="/folders" className="mb-5 inline-block rounded text-sm text-auth-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">← All folders</Link>}
+      </LibraryToolbar>
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".pdf,application/pdf" className="hidden" />
 
-        {/* Search Bar */}
-        <div className="relative w-full md:max-w-md">
-          <input
-            type="text"
-            placeholder="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-customPrimary"
-          />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search size={18} className="text-gray-400" />
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row w-full md:w-auto gap-3">
-          {/* Actions */}
-          <div className="flex gap-3 w-full sm:w-auto">
-            <button
-              onClick={handleUpload}
-              className="px-3 sm:px-4 py-2 bg-customPrimary text-white rounded-lg flex items-center gap-2 hover:bg-blue-700 text-sm sm:text-base flex-1 sm:flex-none justify-center"
-            >
-              <Upload size={16} className="hidden sm:block" />
-              Upload
-            </button>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".pdf,application/pdf"
-              className="hidden"
-            />
-          
-            {/* Sort Dropdown */}
-            <div className="relative z-30 flex-1 sm:flex-none min-w-[120px] sm:min-w-[150px]" ref={sortDropdownRef}>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowSortDropdown(!showSortDropdown);
-                }}
-                className="px-3 sm:px-4 py-2 bg-white border border-gray-300 rounded-full flex items-center gap-2 focus:outline-none w-full justify-center text-sm sm:text-base"
-              >
-                {sortType} <ChevronDown size={16} />
-              </button>
-
-              {showSortDropdown && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg">
-                  {sortOptions.map((option) => (
-                    <button
-                      key={option}
-                      className={`block w-full text-left px-4 py-2 text-xs sm:text-sm hover:bg-gray-100 ${
-                        sortType === option ? 'bg-gray-100' : ''
-                      }`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSortType(option);
-                        setShowSortDropdown(false);
-                      }}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Loading State or Files Grid */}
-      {loading ? (
+      {/* Library content */}
+      {loadError ? <LibraryLoadError /> : loading ? (
         <div className="col-span-full flex items-center justify-center py-8">
           <div className="animate-pulse flex flex-col items-center">
             <div className="h-8 w-8 bg-gray-200 rounded-full mb-2"></div>
@@ -372,25 +287,13 @@ const Files = () => {
         </div>
       ) : (
         <>
-          {/* Files Grid */}
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-            {sortedFiles.map((file, index) => (
-              <div key={`${file.id}-${index}`} className="w-full">
-                <FileCard
-                  file={file}
-                  onRename={handleRename}
-                  onDelete={handleDelete}
-                  onMove={handleMove}
-                  onMoveSuccess={handleMoveSuccess}
-                  folders={folders}
-                />
-              </div>
-            ))}
-          </div>
+          {sortedFiles.length > 0 && <FileList onBulkAction={bulkAction} key={`${folder_id}:${searchQuery}:${sortType}`} files={sortedFiles} label={title} onRename={handleRename} onDelete={handleDelete} onMove={handleMove} folders={folders} />}
 
           {sortedFiles.length === 0 && (
             <div className="text-center py-8 sm:py-12 text-gray-500">
-              No files found. Try adjusting your search or upload a new file.
+              <h2 className="text-lg font-semibold text-auth-ink">{searchQuery ? 'No matching files' : 'Your next study session starts here'}</h2>
+              <p className="mx-auto mt-3 max-w-sm text-sm leading-6">{searchQuery ? 'Try another name, or clear your search.' : 'Upload a PDF from Clip Insights to keep your screenshots, notes, and insights together.'}</p>
+              <button onClick={searchQuery ? () => setSearchQuery('') : handleUpload} className="mt-5 min-h-11 rounded-lg border border-auth-line bg-white px-4 text-sm font-medium text-auth-ink hover:bg-auth-panel">{searchQuery ? 'Clear search' : 'Upload your first PDF'}</button>
             </div>
           )}
         </>

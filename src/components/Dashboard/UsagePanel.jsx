@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatResetTime } from '../../services/planService';
 
@@ -61,9 +62,10 @@ const UsagePanel = ({ planName, usage }) => {
         })}
       </div>
 
-      <div className="mt-6 pt-4 border-t border-gray-100">
-        <Link to="/pricing" className="text-xs font-medium text-customPrimary hover:text-customPrimaryHover">
-          Need higher limits? Compare plans →
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-auth-line pt-4">
+        <div><p className="text-sm font-medium text-auth-ink">More room to learn</p><p className="mt-1 text-xs text-auth-muted">Explore plans with higher AI limits.</p></div>
+        <Link to="/pricing" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-auth-line px-4 text-sm font-medium text-auth-ink transition-colors hover:border-auth-accent hover:text-auth-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent">
+          Compare plans<ArrowRight size={16} aria-hidden="true" />
         </Link>
       </div>
     </section>

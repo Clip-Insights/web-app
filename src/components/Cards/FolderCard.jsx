@@ -1,120 +1,26 @@
-import React, { useState, useEffect, useRef } from "react";
-import { MoreHorizontal, Folder } from "lucide-react";
-import RenamePopup from "./RenamePopup";
+import { useState } from 'react';
+import PropTypes from 'prop-types';
+import { Folder } from 'lucide-react';
+import RenamePopup from './RenamePopup';
+import CardActions from './CardActions';
 
-const FolderCard = ({ folderName, itemCount, size, onRename, onDelete, onClick }) => {
-  const [showOptions, setShowOptions] = useState(false);
-  const [showRenamePopup, setShowRenamePopup] = useState(false);
-  const menuRef = useRef(null);
-  
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setShowOptions(false);
-      }
-    }
-    
-    // Add event listener when dropdown is open
-    if (showOptions) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    
-    // Clean up the event listener
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showOptions]);
-
-  const handleRename = (newName) => {
-    if (newName && newName !== folderName) {
-      onRename(folderName, newName);
-    }
-    setShowRenamePopup(false);
-  };
-
-  const handleDelete = () => {
-    onDelete(folderName);
-    setShowOptions(false);
-  };
-
-  const sizeMBs = (size) => {
-    return (size / 1024 / 1024).toFixed(1);
-  };
-
+export default function FolderCard({ folderName, itemCount = 0, size = 0, onRename, onDelete, onClick }) {
+  const [renaming, setRenaming] = useState(false);
   return (
-    <div 
-      className="relative bg-white border border-gray-200 rounded-3xl transition-all duration-200 hover:!bg-[#F1F1FF] cursor-pointer"
-      onClick={onClick}
-    >
-      {/* Options button */}
-      <div className="absolute top-2 right-2 z-10" ref={menuRef}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation(); // Stop event from bubbling up
-            setShowOptions(!showOptions);
-          }}
-          className="text-gray-400 hover:text-gray-600 p-1"
-        >
-          <MoreHorizontal size={20} />
-        </button>
-        {showOptions && (
-          <div 
-            className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg z-10 border border-gray-200"
-            onClick={(e) => e.stopPropagation()} // Stop event from bubbling up
-          >
-            <div className="py-1">
-              <button
-                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                onClick={(e) => {
-                  e.stopPropagation(); // Stop event from bubbling up
-                  setShowOptions(false);
-                  setShowRenamePopup(true);
-                }}
-              >
-                Rename
-              </button>
-              <button
-                className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                onClick={(e) => {
-                  e.stopPropagation(); // Stop event from bubbling up
-                  handleDelete();
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      {/* Folder content */}
-      <div className="p-4">
-        <div className="flex justify-center mb-3">
-          <Folder size={48} className="text-yellow-400" />
-        </div>
-        <div className="text-center">
-          <p className="font-medium truncate" title={folderName}>
-            {folderName}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {itemCount} items · {sizeMBs(size)} MB
-          </p>
-        </div>
-      </div>
-      {/* Rename Popup */}
-      {showRenamePopup && (
-        <div onClick={(e) => e.stopPropagation()}>
-          <RenamePopup
-            fileName={folderName}
-            onRename={handleRename}
-            onCancel={() => setShowRenamePopup(false)}
-            title="Rename Folder"
-            label="Folder Name"
-          />
-        </div>
-      )}
-    </div>
+    <article className="group relative min-w-0 rounded-xl border border-auth-line bg-white transition-colors hover:border-auth-field">
+      <CardActions name={folderName} actions={[
+        { label: 'Rename', onClick: () => setRenaming(true) },
+        { label: 'Delete', destructive: true, onClick: () => onDelete(folderName) },
+      ]} />
+      <button type="button" onClick={onClick} className="flex min-h-20 w-full items-center gap-3 rounded-xl py-4 pl-4 pr-14 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-auth-accent">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-auth-panel text-auth-accent"><Folder size={23} strokeWidth={1.5} aria-hidden="true" /></span>
+        <span className="min-w-0">
+          <h2 className="line-clamp-2 break-words text-sm font-medium leading-5 text-auth-ink" title={folderName}>{folderName}</h2>
+          <span className="mt-1 block text-xs tabular-nums text-auth-muted">{itemCount} {itemCount === 1 ? 'file' : 'files'}<span className="mx-2">·</span>{(size / 1024 / 1024).toFixed(1)} MB</span>
+        </span>
+      </button>
+      {renaming && <RenamePopup fileName={folderName} title="Rename folder" label="Folder name" onCancel={() => setRenaming(false)} onRename={(name) => { if (name && name !== folderName) onRename(folderName, name); setRenaming(false); }} />}
+    </article>
   );
-};
-
-export default FolderCard;
+}
+FolderCard.propTypes = { folderName: PropTypes.string.isRequired, itemCount: PropTypes.number, size: PropTypes.number, onRename: PropTypes.func.isRequired, onDelete: PropTypes.func.isRequired, onClick: PropTypes.func.isRequired };

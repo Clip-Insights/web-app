@@ -13,9 +13,10 @@ export default {
         auth: {
           ink: "#26283b",
           muted: "#606478",
+          subtle: "#b7bac3",
           line: "#dfe2ed",
           field: "#858da3",
-          panel: "#f5f5fc",
+          panel: "#f6f5f1",
           accent: "#4255ff",
           hover: "#3343dc",
           olive: "#e6eadc",
