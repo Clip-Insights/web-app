@@ -1,8 +1,9 @@
 import { PricingSkeleton, Skeleton } from '../../components/Loading/Skeletons';
 import PropTypes from 'prop-types';
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { readPlanSelection, withPlanSelection } from '../../utils/planSelection';
+import { toast, ToastContainer } from 'react-toastify';
 import { Check, NotebookPen, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMyPlan, fetchPlans, formatStorage } from '../../services/planService';
@@ -49,6 +50,7 @@ function PlanCard({
   accountError = false,
   cancelBusy = false,
   checkoutPending = false,
+  selected = false,
   onUpgrade,
   onCancel,
 }) {
@@ -122,7 +124,7 @@ function PlanCard({
                 : 'bg-auth-accent hover:bg-customPrimaryHover'
             }`}
           >
-            {busy ? 'Opening checkout…' : `Upgrade to ${plan.name}`}
+            {busy ? 'Opening checkout…' : selected ? (isAuthenticated ? 'Continue to checkout' : 'Sign in to continue') : `Upgrade to ${plan.name}`}
           </button>
         ) : isPaid ? (
           <button
@@ -162,6 +164,7 @@ PlanCard.propTypes = {
   purchase: PropTypes.shape({ annual_price_usd: PropTypes.oneOfType([PropTypes.string, PropTypes.number]), paddle_price_id_annual: PropTypes.string, paddle_price_id_monthly: PropTypes.string }),
   cycle: PropTypes.string.isRequired, highlighted: PropTypes.bool, currentSlug: PropTypes.string,
   detailsLoading: PropTypes.bool, accountError: PropTypes.bool, cancelBusy: PropTypes.bool, checkoutPending: PropTypes.bool,
+  selected: PropTypes.bool,
   isAuthenticated: PropTypes.bool, busy: PropTypes.bool, onUpgrade: PropTypes.func.isRequired, onCancel: PropTypes.func.isRequired,
   subscription: PropTypes.shape({ status: PropTypes.string, cancel_at_period_end: PropTypes.bool, current_period_end: PropTypes.string }),
 };
@@ -169,11 +172,18 @@ PlanCard.propTypes = {
 const Pricing = () => {
   const { isAuthenticated, authRequest } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selection = readPlanSelection(searchParams.toString());
+  const cycle = searchParams.get('billing') === 'annual' ? 'annual' : 'monthly';
+  const setCycle = (value) => {
+    const next = new URLSearchParams(searchParams);
+    next.set('billing', value);
+    setSearchParams(next, { replace: true });
+  };
   const [plans, setPlans] = useState(null);
   const [catalog, setCatalog] = useState({});
   const [currentSlug, setCurrentSlug] = useState(null);
   const [subscription, setSubscription] = useState(null);
-  const [cycle, setCycle] = useState('monthly');
   const [busyPlan, setBusyPlan] = useState(null);
   const [error, setError] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -215,7 +225,7 @@ const Pricing = () => {
   const handleUpgrade = async (plan) => {
     if (busyPlan || cancelBusy) return;
     if (!isAuthenticated) {
-      navigate('/login');
+      navigate(withPlanSelection('/login', { plan: plan.slug, billing: cycle }));
       return;
     }
     setBusyPlan(plan.slug);
@@ -253,15 +263,17 @@ const Pricing = () => {
   };
 
   const guest = plans?.find((p) => p.slug === 'guest');
-  const purchasable = plans?.filter((p) => p.slug !== 'guest') ?? [];
+  const selectedPlan = plans?.find(plan => plan.slug === selection?.plan && plan.slug !== 'guest');
+  const purchasable = selectedPlan ? [selectedPlan] : plans?.filter((p) => p.slug !== 'guest') ?? [];
   const hasPurchases = Object.keys(catalog).length > 0;
 
   return (
     <div className="mx-auto max-w-7xl">
+      <ToastContainer />
       <div className="mb-6 flex min-h-16 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0"><h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-auth-ink">A plan for the way you learn.</h1>
+        <div className="min-w-0"><h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-auth-ink">{selectedPlan ? `Your ${selectedPlan.name} plan` : 'A plan for the way you learn.'}</h1>
         <p className="mt-2 text-sm text-auth-muted">
-          Keep your essentials free, or choose more AI usage and storage.
+          {selectedPlan ? 'Review your selection. Checkout opens only when you choose to continue.' : 'Keep your essentials free, or choose more AI usage and storage.'}
         </p></div>
 
         {catalogLoading ? <div role="status" aria-label="Loading billing options"><Skeleton className="h-12 w-48 rounded-full" /></div> : hasPurchases && (
@@ -285,6 +297,9 @@ const Pricing = () => {
         )}
       </div>
 
+      {selectedPlan && <div className="mb-6 flex flex-wrap items-center justify-between gap-4 text-sm"><p className="text-auth-muted">{isAuthenticated ? 'Your selection is ready to review below.' : 'Sign in or create an account to continue with this plan.'}</p><div className="flex flex-wrap gap-4">{!isAuthenticated && <Link className="font-semibold text-auth-accent underline underline-offset-4" to={withPlanSelection('/signup', { plan: selectedPlan.slug, billing: cycle })}>Create an account</Link>}<Link className="text-auth-muted underline underline-offset-4" to={`/pricing?billing=${cycle}`}>Compare all plans</Link></div></div>}
+      {selection && plans && !selectedPlan && <p role="status" className="mb-6 text-sm text-auth-muted">That plan is no longer available. Choose from the current plans below.</p>}
+
       {error && (
         <div className="text-center py-16">
           <p className="text-auth-muted">Plans couldn&apos;t be loaded. Check your connection and try again.</p>
@@ -302,11 +317,12 @@ const Pricing = () => {
 
       {plans && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+          <div className={selectedPlan ? 'mx-auto w-full max-w-xl' : 'grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch'}>
             {purchasable.map((plan) => (
               <PlanCard
                 key={plan.slug}
                 plan={plan}
+                selected={Boolean(selectedPlan)}
                 purchase={catalog[plan.slug]}
                 cycle={cycle}
                 highlighted={plan.slug === 'pro'}
@@ -326,7 +342,7 @@ const Pricing = () => {
 
           <p className="mt-4 text-xs leading-5 text-auth-muted">AI allowances reset on a rolling 24-hour window. Prices are in USD.</p>
 
-          {guest && (
+          {guest && !selectedPlan && (
             <div className="mt-6 rounded-xl border border-auth-line bg-white p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
                 <NotebookPen className="w-5 h-5 text-auth-accent" />

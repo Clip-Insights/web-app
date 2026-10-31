@@ -1,8 +1,10 @@
-import React from "react";
+import { Link, useLocation } from "react-router-dom";
+import { readPlanSelection, withPlanSelection } from "../../utils/planSelection";
 import signup_png from "/images/signup.png";
 import { ToastContainer } from "react-toastify";
 
 const SignupSuccess = () => {
+  const selection = readPlanSelection(useLocation().search);
   return (
     <div className="flex flex-col w-full md:flex-row justify-around items-center min-h-92vh p-8">
       {/* Image Section */}
@@ -22,9 +24,9 @@ const SignupSuccess = () => {
         </p>
         <p className="text-gray-700 text-sm">
           Already verified?{" "}
-          <a href="/login" className="text-customPrimary hover:underline">
+          <Link to={withPlanSelection("/login", selection)} className="text-customPrimary hover:underline">
             Login
-          </a>
+          </Link>
         </p>
         <ToastContainer />
       </div>

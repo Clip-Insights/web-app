@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { pendingPlanSelection, readPlanSelection, withPlanSelection } from "../../utils/planSelection";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../../services/Utils";
 import signup_png from "/images/signup.png";
@@ -7,6 +8,8 @@ import { getApiUrl } from "../../services/apiService";
 
 const VerifyEmail = () => {
   const { uid, token } = useParams();
+  const location = useLocation();
+  const [selection] = useState(() => readPlanSelection(location.search) ?? pendingPlanSelection());
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -30,7 +33,7 @@ const VerifyEmail = () => {
 
         if (response.ok) {
           setSuccess(data.msg || "Email verified successfully!");
-          setTimeout(() => navigate("/login"), 3000); // Redirect to login
+          setTimeout(() => navigate(withPlanSelection("/login", selection)), 3000); // Redirect to login
         } else {
           setError(data.error || "Failed to verify email.");
         }
@@ -43,7 +46,7 @@ const VerifyEmail = () => {
     };
 
     verifyEmail();
-  }, [uid, token, navigate]);
+  }, [uid, token, navigate, selection]);
 
   // Handle resend verification email
   const handleResendEmail = async (e) => {

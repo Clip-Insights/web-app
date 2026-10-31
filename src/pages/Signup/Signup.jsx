@@ -1,7 +1,8 @@
+import { readPlanSelection, withPlanSelection, planDestination, clearPendingPlanSelection, rememberPlanSelection } from "../../utils/planSelection";
 import { useState } from "react";
 import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../../services/Utils";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import AuthLayout from "../../components/Auth/AuthLayout";
 import AuthField from "../../components/Auth/AuthField";
 import { ArrowRight, LoaderCircle } from "lucide-react";
@@ -10,12 +11,13 @@ import { useAuth } from "../../context/AuthContext";
 import { GoogleLogin } from "@react-oauth/google";
 
 const Signup = () => {
+  const selection = readPlanSelection(useLocation().search);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
@@ -63,10 +65,8 @@ const Signup = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // handleSuccess(data.msg || "Signup successful!");
-        setTimeout(() => {
-          navigate("/signup-success");
-        }, 1500);
+        rememberPlanSelection(selection);
+        navigate(withPlanSelection("/signup-success", selection));
       } else {
         const errorMessage =
           data.errors?.email?.[0] ||
@@ -98,9 +98,8 @@ const Signup = () => {
       if (response.ok) {
         login({ access: data.token.access, refresh: data.token.refresh });
         handleSuccess("Signed up with Google!");
-        setTimeout(() => {
-          navigate("/");
-        }, 1500);
+        clearPendingPlanSelection();
+        navigate(planDestination(selection));
       } else {
         handleError(data.error || "Google signup failed");
       }
@@ -110,12 +109,15 @@ const Signup = () => {
     }
   };
 
+  if (isAuthenticated) return <Navigate to={planDestination(selection)} replace />;
+
   return (
     <AuthLayout>
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Make room for your ideas.</h1>
         <p className="mt-3 text-sm leading-6 text-auth-muted">Create your account. Keep your learning close.</p>
       </div>
+      {selection && <p className="mb-6 rounded-lg border border-auth-line bg-auth-panel p-4 text-sm text-auth-muted">Your selected plan and {selection.billing} billing will be kept while you sign in. You can review the total before payment.</p>}
       <form onSubmit={handleSignup} aria-label="Create account">
         <fieldset disabled={loading} className="space-y-4">
           <AuthField label="Full name" id="fullName" autoComplete="name" placeholder="Your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
@@ -132,7 +134,7 @@ const Signup = () => {
       <div className="flex min-h-11 justify-center">
         <GoogleLogin size="large" shape="rectangular" text="signup_with" width="256" onSuccess={handleGoogleSignup} onError={() => handleError("Google signup failed")} />
       </div>
-      <p className="mt-6 text-center text-sm text-auth-muted">Already have an account? <Link to="/login" className="rounded font-semibold text-auth-accent underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Sign in</Link></p>
+      <p className="mt-6 text-center text-sm text-auth-muted">Already have an account? <Link to={withPlanSelection("/login", selection)} className="rounded font-semibold text-auth-accent underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-auth-accent">Sign in</Link></p>
       <ToastContainer />
     </AuthLayout>
   );
